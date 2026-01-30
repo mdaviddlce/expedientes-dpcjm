@@ -1,0 +1,54 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<section class="panel glass">
+  <div class="panel__head">
+    <div>
+      <h2>{{ "NUEVO USUARIO" if mode=="new" else "EDITAR USUARIO" }}</h2>
+      <p class="muted">ADMINISTRADOR</p>
+    </div>
+    <div class="row">
+      <a class="btn btn--ghost" href="{{ url_for('users_list') }}">REGRESAR</a>
+      <a class="btn btn--ghost" href="{{ url_for('index') }}">INICIO</a>
+    </div>
+  </div>
+
+  <div style="padding: 0 16px 16px;">
+    <form method="post" action="{{ url_for('user_create') if mode=='new' else url_for('user_update', user_id=user['id']) }}">
+      <div class="toolbar" style="grid-template-columns: 1fr 220px 220px auto;">
+        <div class="field">
+          <label>USUARIO</label>
+          <input name="username" value="{{ user['username'] if user else '' }}" placeholder="ej. captura1" required>
+        </div>
+
+        <div class="field">
+          <label>ROL</label>
+          <select name="role" required>
+            {% for r in roles %}
+              <option value="{{ r }}" {% if user and user["role"]==r %}selected{% endif %}>{{ r }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="field">
+          <label>ACTIVO</label>
+          <select name="is_active">
+            <option value="1" {% if not user or user["is_active"]==1 %}selected{% endif %}>SI</option>
+            <option value="0" {% if user and user["is_active"]==0 %}selected{% endif %}>NO</option>
+          </select>
+        </div>
+
+        <div class="actions">
+          <button class="btn" type="submit">GUARDAR</button>
+        </div>
+      </div>
+
+      <div class="field" style="padding-top: 6px;">
+        <label>CONTRASEÑA {% if mode=="edit" %}(DEJA VACIO PARA NO CAMBIAR){% endif %}</label>
+        <input name="password" type="password" {% if mode=="new" %}required{% endif %} placeholder="{% if mode=='new' %}Contraseña{% else %}Nueva contraseña (opcional){% endif %}">
+      </div>
+    </form>
+  </div>
+</section>
+
+{% endblock %}

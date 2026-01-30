@@ -1,0 +1,47 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<section class="panel glass">
+  <div class="panel__head">
+    <div>
+      <h2>USUARIOS</h2>
+      <p class="muted">SOLO ADMINISTRADOR</p>
+    </div>
+    <div class="row">
+      <a class="btn btn--ghost" href="{{ url_for('index') }}">REGRESAR AL INICIO</a>
+      <a class="btn" href="{{ url_for('user_new') }}">+ NUEVO USUARIO</a>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>USUARIO</th>
+          <th>ROL</th>
+          <th>ACTIVO</th>
+          <th>CREADO</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+          <tr>
+            <td class="mono">{{ r["username"] }}</td>
+            <td>{{ r["role"] }}</td>
+            <td>{{ "SI" if r["is_active"]==1 else "NO" }}</td>
+            <td class="mono">{{ (r["created_at"] or "")[:10] }}</td>
+            <td class="right">
+              <a class="btn btn--ghost btn--sm" href="{{ url_for('user_edit', user_id=r['id']) }}">EDITAR</a>
+            </td>
+          </tr>
+        {% endfor %}
+        {% if rows|length == 0 %}
+          <tr><td colspan="5" class="muted center">SIN USUARIOS.</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+{% endblock %}

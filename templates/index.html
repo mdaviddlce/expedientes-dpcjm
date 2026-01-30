@@ -1,0 +1,184 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<section class="panel glass">
+  <div class="panel__head">
+    <div>
+      <h2>EXPEDIENTES</h2>
+      <p class="muted">
+        LISTADO GENERAL · <span id="countLabel">{{ rows|length }}</span> REGISTRO(S)
+      </p>
+    </div>
+
+    <div class="row">
+      <form id="zipForm" method="post" action="{{ url_for('expedientes_zip') }}" class="inline">
+        <button class="btn btn--ghost" type="submit">DESCARGAR PDFS</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Toolbar: búsqueda, año, orden -->
+  <form id="filters" class="toolbar" method="get" action="{{ url_for('index') }}">
+    <div class="field">
+      <label>BUSCAR</label>
+      <input id="q" name="q" placeholder="EXPEDIENTE, INMUEBLE, REPRESENTANTE, TELEFONO..."
+             value="{{ request.args.get('q','') }}">
+    </div>
+
+    <div class="field">
+      <label>AÑO</label>
+      <select id="year" name="year">
+        <option value="">TODOS</option>
+        {# Construye lista de años desde created_at (si existe) #}
+        {% set years = {} %}
+        {% for r in rows %}
+          {% set y = (r["created_at"] or "")[:4] %}
+          {% if y and (y|length)==4 %}
+            {% set _ = years.update({y: 1}) %}
+          {% endif %}
+        {% endfor %}
+        {% for y in years.keys()|list|sort|reverse %}
+          <option value="{{ y }}" {% if request.args.get('year')==y %}selected{% endif %}>{{ y }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="field">
+      <label>ORDEN</label>
+      <select id="sort" name="sort">
+        <option value="desc" {% if request.args.get('sort','desc')=='desc' %}selected{% endif %}>
+            DESSENDIENTE
+        </option>
+        <option value="asc" {% if request.args.get('sort')=='asc' %}selected{% endif %}>
+            ASCENDIENTE
+        </option>
+      </select>
+    </div>
+
+    <div class="actions">
+      <button class="btn" type="submit">APLICAR</button>
+      <a class="btn btn--ghost" href="{{ url_for('index') }}">LIMPIAR</a>
+    </div>
+  </form>
+
+  <div class="table-wrap">
+    <table class="table" id="expTable">
+      <thead>
+        <tr>
+          <th class="center"><input type="checkbox" id="selectAll"></th>
+          <th>EXPEDIENTE</th>
+          <th>INMUEBLE</th>
+          <th>REPRESENTANTE</th>
+          <th>ARCHIVO FISICO</th>
+          <th class="center">AVISOS</th>
+          <th class="right">ACCIONES</th>
+        </tr>
+      </thead>
+
+      <tbody id="expBody">
+        {% for r in rows %}
+          {% set v = (r["verificaciones"] or 0)|int %}
+          {% set sev = "ok" if v <= 1 else ("warn" if v == 2 else "bad") %}
+          {% set year = (r["created_at"] or "")[:4] %}
+          {% set search = (
+              (r["expediente_code"] or "") ~ " " ~
+              (r["inmueble_nombre"] or "") ~ " " ~
+              (r["representante_legal"] or "") ~ " " ~
+              (r["telefono"] or "") ~ " " ~
+              (r["domicilio_inspeccion"] or "")
+            )|lower
+          %}
+
+          <tr class="rowExp"
+              data-year="{{ year }}"
+              data-created="{{ r['created_at'] or '' }}"
+              data-search="{{ search|e }}">
+            <td class="center">
+              <input type="checkbox" name="expediente_ids" value="{{ r['id'] }}" form="zipForm">
+            </td>
+
+            <td class="mono">{{ r["expediente_code"] }}</td>
+            <td>{{ r["inmueble_nombre"] }}</td>
+            <td>{{ r["representante_legal"] or "—" }}</td>
+            <td>{{ r["archivo_fisico"] or "—" }}</td>
+
+            <td class="center">
+            <div class="avisos-control" data-id="{{ r['id'] }}">
+                <span class="badge badge--{{ sev }} aviso-badge">{{ v }}</span>
+
+                {% if session.get("role") in ["CAPTURA","ADMINISTRADOR"] %}
+                <button type="button" class="btn btn--chip btn-avisos" data-action="dec" title="Disminuir">−</button>
+                <button type="button" class="btn btn--chip btn-avisos" data-action="inc" title="Aumentar">+</button>
+                {% endif %}
+            </div>
+            </td>
+
+            <td class="right">
+              <a class="btn btn--ghost btn--sm" href="{{ url_for('expediente_view', expediente_id=r['id']) }}">VER</a>
+              <a class="btn btn--ghost btn--sm" href="{{ url_for('expediente_pdf', expediente_id=r['id']) }}">PDF</a>
+
+              {% if session.get("role") in ["CAPTURA","ADMINISTRADOR"] %}
+                <a class="btn btn--ghost btn--sm" href="{{ url_for('expediente_edit', expediente_id=r['id']) }}">EDITAR</a>
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+
+        {% if rows|length == 0 %}
+          <tr><td colspan="7" class="muted center">SIN REGISTROS.</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<script>
+  // Select all para ZIP
+  const selectAll = document.getElementById("selectAll");
+  if (selectAll) {
+    selectAll.addEventListener("change", () => {
+      document.querySelectorAll('input[name="expediente_ids"]').forEach(cb => {
+        cb.checked = selectAll.checked;
+      });
+    });
+  }
+
+  // Filtro/orden en el FRONT (para no depender de app.py)
+  (function(){
+    const params = new URLSearchParams(window.location.search);
+    const q = (params.get("q") || "").trim().toLowerCase();
+    const year = (params.get("year") || "").trim();
+    const sort = (params.get("sort") || "desc").trim(); // asc|desc
+
+    const rows = Array.from(document.querySelectorAll(".rowExp"));
+    let visible = 0;
+
+    // filtra
+    rows.forEach(tr => {
+      const s = (tr.dataset.search || "");
+      const y = (tr.dataset.year || "");
+      const matchQ = !q || s.includes(q);
+      const matchY = !year || y === year;
+      const show = matchQ && matchY;
+      tr.style.display = show ? "" : "none";
+      if (show) visible++;
+    });
+
+    // ordena por created_at (texto ISO); si no hay, no rompe
+    const tbody = document.getElementById("expBody");
+    const visibleRows = rows.filter(r => r.style.display !== "none");
+    visibleRows.sort((a,b) => {
+      const ac = a.dataset.created || "";
+      const bc = b.dataset.created || "";
+      if (ac === bc) return 0;
+      return (sort === "asc") ? (ac.localeCompare(bc)) : (bc.localeCompare(ac));
+    });
+    visibleRows.forEach(r => tbody.appendChild(r));
+
+    // contador
+    const countLabel = document.getElementById("countLabel");
+    if (countLabel) countLabel.textContent = String(visible);
+  })();
+</script>
+
+{% endblock %}

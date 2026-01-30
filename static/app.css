@@ -1,0 +1,466 @@
+/* static/app.css */
+/* =========================
+   Liquid Glass · Minimal UI
+   ========================= */
+
+:root{
+  --bg: #0b1020;
+  --bg2:#0a0f1e;
+  --text:#e8ecff;
+  --muted:#a6b0d2;
+  --border: rgba(255,255,255,.14);
+
+  --glass: rgba(255,255,255,.10);
+  --glass2: rgba(255,255,255,.06);
+
+  --shadow: 0 12px 40px rgba(0,0,0,.35);
+  --shadow2: 0 8px 24px rgba(0,0,0,.25);
+
+  --accent:#7aa2ff;
+  --ok: rgba(40, 210, 120, .18);
+  --warn: rgba(255, 210, 80, .18);
+  --bad: rgba(255, 90, 90, .18);
+}
+
+@media (prefers-color-scheme: light){
+  :root{
+    --bg: #f4f7ff;
+    --bg2:#eef3ff;
+    --text:#0e1530;
+    --muted:#4d5a85;
+    --border: rgba(15,25,55,.14);
+    --glass: rgba(255,255,255,.72);
+    --glass2: rgba(255,255,255,.55);
+    --shadow: 0 12px 40px rgba(25,35,65,.18);
+    --shadow2: 0 8px 24px rgba(25,35,65,.14);
+    --accent:#295cff;
+  }
+}
+
+/* Forzado por usuario (dataset-theme) */
+html[data-theme="dark"]{
+  --bg: #0b1020;
+  --bg2:#0a0f1e;
+  --text:#e8ecff;
+  --muted:#a6b0d2;
+  --border: rgba(255,255,255,.14);
+  --glass: rgba(255,255,255,.10);
+  --glass2: rgba(255,255,255,.06);
+  --shadow: 0 12px 40px rgba(0,0,0,.35);
+  --shadow2: 0 8px 24px rgba(0,0,0,.25);
+  --accent:#7aa2ff;
+}
+html[data-theme="light"]{
+  --bg: #f4f7ff;
+  --bg2:#eef3ff;
+  --text:#0e1530;
+  --muted:#4d5a85;
+  --border: rgba(15,25,55,.14);
+  --glass: rgba(255,255,255,.72);
+  --glass2: rgba(255,255,255,.55);
+  --shadow: 0 12px 40px rgba(25,35,65,.18);
+  --shadow2: 0 8px 24px rgba(25,35,65,.14);
+  --accent:#295cff;
+}
+
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;
+  color:var(--text);
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+  background:
+    radial-gradient(1200px 700px at 15% 10%, rgba(122,162,255,.25), transparent 60%),
+    radial-gradient(900px 600px at 80% 20%, rgba(255,140,180,.14), transparent 55%),
+    radial-gradient(900px 650px at 60% 90%, rgba(90,255,210,.12), transparent 55%),
+    linear-gradient(180deg, var(--bg), var(--bg2));
+}
+
+/* Helpers */
+.muted{color:var(--muted)}
+.mono{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;}
+.center{text-align:center}
+.right{text-align:right}
+.inline{display:inline}
+.hide-sm{display:inline}
+@media (max-width: 720px){ .hide-sm{display:none} }
+
+/* Layout */
+.container{
+  width:min(1180px, calc(100% - 28px));
+  margin: 18px auto 42px;
+}
+
+.stack{display:grid; gap:10px; margin-bottom:14px;}
+.row{display:flex; align-items:center; gap:10px; flex-wrap:wrap;}
+
+.spacer{height:14px}
+
+/* Liquid Glass blocks */
+.glass{
+  background: linear-gradient(180deg, var(--glass), var(--glass2));
+  border: 1px solid var(--border);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  box-shadow: var(--shadow);
+}
+
+.panel{
+  border-radius: 20px;
+  overflow:hidden;
+}
+
+.panel__head{
+  padding: 16px 16px 12px;
+  display:flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.panel__head h2{
+  margin:0;
+  font-size: 18px;
+  letter-spacing: .04em;
+}
+.panel__head p{
+  margin:6px 0 0;
+  font-size: 12px;
+}
+
+/* Topbar */
+.topbar{
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  padding: 12px 14px;
+  margin: 10px auto 0;
+  width: min(1180px, calc(100% - 28px));
+  border-radius: 18px;
+  display:flex;
+  justify-content: space-between;
+  align-items:center;
+  gap: 12px;
+}
+
+.brand{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  text-decoration:none;
+  color: var(--text);
+}
+.brand__dot{
+  width: 12px; height:12px;
+  border-radius: 999px;
+  background: var(--accent);
+  box-shadow: 0 0 0 6px rgba(122,162,255,.18);
+}
+.brand__text{display:grid; line-height: 1.1}
+.brand__title{font-weight: 900; letter-spacing:.12em; font-size: 12px}
+.brand__sub{font-size: 11px; color: var(--muted); letter-spacing:.06em}
+
+.topbar__right{display:flex; align-items:center; gap:10px; flex-wrap:wrap; justify-content:flex-end}
+
+/* User pill */
+.userpill{
+  padding: 8px 10px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,.06);
+  display:grid;
+  gap: 2px;
+  min-width: 140px;
+}
+.userpill__name{
+  font-weight: 900;
+  font-size: 12px;
+  letter-spacing:.06em;
+}
+.userpill__role{
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing:.06em;
+}
+
+/* Buttons */
+.btn{
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,.10);
+  color: var(--text);
+  padding: 10px 12px;
+  border-radius: 14px;
+  font-weight: 800;
+  letter-spacing: .06em;
+  font-size: 12px;
+  cursor:pointer;
+  text-decoration:none;
+  display:inline-flex;
+  align-items:center;
+  gap: 8px;
+  box-shadow: var(--shadow2);
+}
+.btn:hover{transform: translateY(-1px)}
+.btn:active{transform: translateY(0)}
+.btn--ghost{
+  background: rgba(255,255,255,.06);
+  box-shadow: none;
+}
+.btn--sm{
+  padding: 8px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+}
+.btn--chip{
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  min-width: 36px;
+  justify-content:center;
+  background: rgba(255,255,255,.06);
+  box-shadow: none;
+}
+
+/* Toast */
+.toast{
+  border-radius: 16px;
+  padding: 12px 12px;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,.06);
+}
+.toast__row{display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap}
+.toast--ok{outline: 1px solid rgba(40,210,120,.28)}
+.toast--err{outline: 1px solid rgba(255,90,90,.28)}
+.toast__msg{font-weight:700; letter-spacing:.04em; font-size: 12px;}
+.toast__actions{display:flex; gap:8px; flex-wrap:wrap}
+
+/* Toolbar */
+.toolbar{
+  display:grid;
+  grid-template-columns: 1fr 160px 220px auto;
+  gap: 12px;
+  padding: 0 16px 16px;
+  align-items:end;
+}
+@media (max-width: 980px){
+  .toolbar{grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 560px){
+  .toolbar{grid-template-columns: 1fr; }
+}
+
+.field label{
+  display:block;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing:.10em;
+  margin-bottom: 6px;
+  color: var(--muted);
+}
+.field input, .field select{
+  width:100%;
+  padding: 11px 12px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,.08);
+  color: var(--text);
+  outline:none;
+}
+.field input::placeholder{color: rgba(166,176,210,.75)}
+.actions{display:flex; gap:10px; justify-content:flex-end; flex-wrap:wrap}
+
+/* Table */
+.table-wrap{padding: 0 16px 16px; overflow:auto}
+.table{
+  width:100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  overflow:hidden;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+}
+.table thead th{
+  text-align:left;
+  font-size: 11px;
+  letter-spacing:.10em;
+  color: var(--muted);
+  padding: 12px 10px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(255,255,255,.04);
+  white-space: nowrap;
+}
+.table tbody td{
+  padding: 12px 10px;
+  border-bottom: 1px solid rgba(255,255,255,.08);
+  vertical-align: middle;
+}
+.table tbody tr:hover{
+  background: rgba(255,255,255,.05);
+}
+.table tbody tr:last-child td{border-bottom: none}
+
+/* Badges */
+.badge{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-width: 34px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-weight: 900;
+  font-size: 12px;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,.06);
+  margin-right: 6px;
+}
+.badge--ok{background: var(--ok)}
+.badge--warn{background: var(--warn)}
+.badge--bad{background: var(--bad)}
+
+/* =========================
+   LAYOUT / MARGENES
+   ========================= */
+
+:root{
+  --page-max: 1100px;
+  --gutter: clamp(14px, 2.5vw, 28px);
+  --stack: clamp(10px, 1.6vw, 18px);
+}
+
+/* Fondo y separación general */
+body{
+  min-height: 100vh;
+}
+
+/* Contenedor central */
+.container{
+  width: min(var(--page-max), calc(100% - (var(--gutter) * 2)));
+  margin: 18px auto 28px auto;
+  padding: 0;
+}
+
+/* Si tienes un header/topbar fijo o pegado, deja aire debajo */
+.topbar,
+.navbar,
+.header{
+  margin-bottom: 16px;
+}
+
+/* Panel: que no se pegue a los bordes */
+.panel{
+  margin: 0 0 var(--stack) 0;
+  padding: 14px;
+  border-radius: 18px;
+}
+
+/* Si ya tienes .panel__head pero se ve aplastado */
+.panel__head{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 6px 12px 6px;
+}
+
+/* Mejora el “stack” vertical dentro de paneles */
+.panel > * + *{
+  margin-top: var(--stack);
+}
+
+/* =========================
+   FORM / CAMPOS
+   ========================= */
+
+.field{
+  display: grid;
+  gap: 6px;
+}
+
+/* Evita inputs pegados al borde del panel */
+input, select, textarea{
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Barra toolbar (tu bloque de filtros / acciones) */
+.toolbar{
+  display: grid;
+  gap: 12px;
+  align-items: end;
+  padding: 10px;
+  border-radius: 16px;
+}
+
+/* En pantallas grandes: más columnas; en chicas: se apila */
+@media (min-width: 900px){
+  .toolbar{
+    grid-template-columns: 1.2fr 0.6fr 0.6fr auto;
+  }
+}
+@media (max-width: 899px){
+  .toolbar{
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Botonera inferior (cancelar/guardar) con aire */
+.actions,
+.form-actions,
+.footer-actions{
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  padding-top: 6px;
+}
+
+/* =========================
+   TABLA CHECKLIST
+   ========================= */
+
+.table-wrap{
+  overflow: auto;
+  border-radius: 16px;
+}
+
+/* La tabla dentro del formulario se veía pegada */
+.table{
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.table th, .table td{
+  padding: 12px 12px;
+}
+
+/* Header de tabla con mejor separación */
+.table thead th{
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+/* =========================
+   GLASS (mejora visual)
+   ========================= */
+
+.glass{
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+}
+
+/* Panel con “aire” interior real */
+.panel.glass{
+  padding: 16px;
+}
+
+/* =========================
+   TOPBAR: que no se pegue
+   ========================= */
+
+/* Si tu topbar está dentro de container, esto solo suaviza */
+.topbar{
+  border-radius: 18px;
+  padding: 10px 12px;
+}

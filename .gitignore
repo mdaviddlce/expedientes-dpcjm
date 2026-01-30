@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Entornos
+.venv/
+venv/
+
+# Flask instance (suele contener config/DB)
+instance/
+
+# Base de datos
+*.db
+*.sqlite
+*.sqlite3
+
+# Secrets
+.env
+
+# macOS
+.DS_Store
+
+# Archivos generados
+*.pdf
+*.zip

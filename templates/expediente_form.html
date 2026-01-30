@@ -1,0 +1,105 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<section class="panel glass">
+  <div class="panel__head">
+    <div>
+      <h2>{{ "NUEVO EXPEDIENTE" if mode=="new" else "EDITAR EXPEDIENTE" }}</h2>
+      <p class="muted">CAPTURA</p>
+    </div>
+    <a class="btn btn--ghost" href="{{ url_for('index') }}">REGRESAR AL INICIO</a>
+  </div>
+
+  <form method="post" action="{{ url_for('expediente_create') if mode=='new' else url_for('expediente_update', expediente_id=expediente['id']) }}">
+    <div class="grid2">
+      <div class="field">
+        <label>EXPEDIENTE</label>
+        <input name="expediente_code" value="{{ expediente['expediente_code'] if expediente else '' }}" required>
+      </div>
+
+      <div class="field">
+        <label>NOMBRE DEL INMUEBLE</label>
+        <input name="inmueble_nombre" value="{{ expediente['inmueble_nombre'] if expediente else '' }}" required>
+      </div>
+
+      <div class="field">
+        <label>REPRESENTANTE LEGAL</label>
+        <input name="representante_legal" value="{{ expediente['representante_legal'] if expediente else '' }}">
+      </div>
+
+      <div class="field">
+        <label>APODERADOS</label>
+        <input name="apoderados" value="{{ expediente['apoderados'] if expediente else '' }}">
+      </div>
+
+      <div class="field">
+        <label>DOMICILIO DE LA INSPECCION</label>
+        <input name="domicilio_inspeccion" value="{{ expediente['domicilio_inspeccion'] if expediente else '' }}">
+      </div>
+
+      <div class="field">
+        <label>TELEFONO</label>
+        <input name="telefono" value="{{ expediente['telefono'] if expediente else '' }}">
+      </div>
+
+      <div class="field">
+        <label>QUIEN SOLICITA</label>
+        <select name="quien_solicita" required>
+          {% for opt in who_options %}
+            <option value="{{ opt }}" {% if expediente and expediente["quien_solicita"]==opt %}selected{% endif %}>{{ opt }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="field">
+        <label>ARCHIVO FISICO</label>
+        <select name="archivo_fisico">
+          <option value="">—</option>
+          {% for opt in ["Archivo 1","Archivo 2","Archivo 3","Archivo 4"] %}
+            <option value="{{ opt }}" {% if expediente and expediente["archivo_fisico"]==opt %}selected{% endif %}>{{ opt }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <div class="spacer"></div>
+
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>CONTENIDO DEL EXPEDIENTE</th>
+            <th class="center">PRESENTA</th>
+            <th class="center">NO PRESENTA</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in checklist %}
+            {% set st = checklist_state.get(item["id"]) if checklist_state else None %}
+            <tr>
+              <td>{{ item["label"] }}</td>
+              <td class="center">
+                <input class="radio-toggle" type="radio" name="item_{{ item['id'] }}" value="presenta"
+                       {% if st=="presenta" %}checked{% endif %}>
+              </td>
+              <td class="center">
+                <input class="radio-toggle" type="radio" name="item_{{ item['id'] }}" value="no_presenta"
+                       {% if st=="no_presenta" %}checked{% endif %}>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <p class="muted small" style="margin-top:8px;">
+        TIP: PARA QUITAR UNA SELECCION, HAZ CLIC DE NUEVO SOBRE EL MISMO RADIO.
+      </p>
+    </div>
+
+    <div class="actions">
+      <a class="btn btn--ghost" href="{{ url_for('index') }}">CANCELAR</a>
+      <button class="btn" type="submit">GUARDAR</button>
+    </div>
+  </form>
+</section>
+
+{% endblock %}

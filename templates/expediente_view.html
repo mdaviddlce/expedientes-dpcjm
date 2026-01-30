@@ -1,0 +1,70 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<section class="panel glass">
+  <div class="panel__head">
+    <div>
+      <h2>EXPEDIENTE</h2>
+      <p class="muted mono">{{ expediente["expediente_code"] }}</p>
+    </div>
+
+    <div class="row">
+      <a class="btn btn--ghost" href="{{ url_for('index') }}">REGRESAR AL INICIO</a>
+      <a class="btn btn--ghost" href="{{ url_for('expediente_pdf', expediente_id=expediente['id']) }}">DESCARGAR PDF</a>
+
+      {% if can_edit %}
+        <a class="btn btn--ghost" href="{{ url_for('expediente_edit', expediente_id=expediente['id']) }}">EDITAR</a>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="paper glass-soft">
+    <div class="table-wrap">
+      <table class="table table--compact">
+        <tbody>
+          <tr><th>EXPEDIENTE</th><td class="mono">{{ expediente["expediente_code"] }}</td></tr>
+          <tr><th>NOMBRE DEL INMUEBLE</th><td>{{ expediente["inmueble_nombre"] }}</td></tr>
+          <tr><th>REPRESENTANTE LEGAL</th><td>{{ expediente["representante_legal"] or "—" }}</td></tr>
+          <tr><th>APODERADOS</th><td>{{ expediente["apoderados"] or "—" }}</td></tr>
+          <tr><th>DOMICILIO DE LA INSPECCION</th><td>{{ expediente["domicilio_inspeccion"] or "—" }}</td></tr>
+          <tr><th>TELEFONO</th><td>{{ expediente["telefono"] or "—" }}</td></tr>
+          <tr><th>QUIEN SOLICITA</th><td>{{ expediente["quien_solicita"] }}</td></tr>
+          <tr><th>ARCHIVO FISICO</th><td>{{ expediente["archivo_fisico"] or "—" }}</td></tr>
+          <tr><th>VERIFICACIONES/AVISOS</th><td>{{ (expediente["verificaciones"] or 0) | int }}</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="spacer"></div>
+
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>CONTENIDO DEL EXPEDIENTE</th>
+            <th class="center">PRESENTA</th>
+            <th class="center">NO PRESENTA</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in checklist %}
+            {% set st = checklist_state.get(item["id"]) %}
+            <tr>
+              <td>{{ item["label"] }}</td>
+              <td class="center">{{ "✓" if st=="presenta" else "" }}</td>
+              <td class="center">{{ "✓" if st=="no_presenta" else "" }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="spacer"></div>
+
+    <div class="footer">
+      C. Beltran 315, Zona Centro, 20920 Jesús María, Ags. Tel: 449 963 9921
+    </div>
+  </div>
+</section>
+
+{% endblock %}

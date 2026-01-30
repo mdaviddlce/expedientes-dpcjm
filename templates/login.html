@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Login · Expedientes</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+</head>
+<body>
+  <main class="container">
+    <section class="panel glass" style="max-width:520px;margin:60px auto 0;">
+      <div class="panel__head">
+        <div>
+          <h2>INICIAR SESION</h2>
+          <p class="muted">ACCESO LOCAL · SIN SERVICIOS EXTERNOS</p>
+        </div>
+      </div>
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div class="stack">
+            {% for category, msg in messages %}
+              <div class="toast {{ 'toast--ok' if category=='ok' else 'toast--err' }}">{{ msg }}</div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+
+      <form method="post" action="{{ url_for('login_post') }}" style="margin-top:12px;">
+        <div class="field">
+          <label>USUARIO</label>
+          <input name="username" autocomplete="username" required>
+        </div>
+        <div class="field" style="margin-top:12px;">
+          <label>CONTRASEÑA</label>
+          <input name="password" type="password" autocomplete="current-password" required>
+        </div>
+
+        <div class="actions" style="justify-content:flex-end;">
+          <button class="btn" type="submit">ENTRAR</button>
+        </div>
+
+        <p class="muted small">
+          PRIMER ACCESO: <span class="mono">admin</span> / <span class="mono">Admin-2026!</span> (CAMBIARLO DESPUES).
+        </p>
+      </form>
+    </section>
+  </main>
+</body>
+</html>
