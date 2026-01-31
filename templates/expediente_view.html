@@ -8,14 +8,27 @@
       <p class="muted mono">{{ expediente["expediente_code"] }}</p>
     </div>
 
-    <div class="row">
-      <a class="btn btn--ghost" href="{{ url_for('index') }}">REGRESAR AL INICIO</a>
-      <a class="btn btn--ghost" href="{{ url_for('expediente_pdf', expediente_id=expediente['id']) }}">DESCARGAR PDF</a>
+    <div class="row" style="justify-content:flex-end; gap:10px; margin-bottom:12px;">
+    <a class="btn btn--ghost" href="{{ url_for('index') }}">← VOLVER</a>
 
-      {% if can_edit %}
-        <a class="btn btn--ghost" href="{{ url_for('expediente_edit', expediente_id=expediente['id']) }}">EDITAR</a>
-      {% endif %}
-    </div>
+    <a class="btn btn--ghost" href="{{ url_for('expediente_pdf', expediente_id=expediente['id']) }}">
+      PDF
+    </a>
+
+    {% if can_edit %}
+      <a class="btn" href="{{ url_for('expediente_edit', expediente_id=expediente['id']) }}">
+        EDITAR
+      </a>
+
+      <form method="post"
+            action="{{ url_for('expediente_delete', expediente_id=expediente['id']) }}"
+            class="inline"
+            onsubmit="return confirm('¿ELIMINAR PERMANENTEMENTE ESTE EXPEDIENTE? ESTA ACCION NO SE PUEDE DESHACER.');">
+        <button class="btn btn--ghost" type="submit">ELIMINAR</button>
+      </form>
+    {% endif %}
+  </div>
+    
   </div>
 
   <div class="paper glass-soft">
@@ -61,9 +74,6 @@
 
     <div class="spacer"></div>
 
-    <div class="footer">
-      C. Beltran 315, Zona Centro, 20920 Jesús María, Ags. Tel: 449 963 9921
-    </div>
   </div>
 </section>
 

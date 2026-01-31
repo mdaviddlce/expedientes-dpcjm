@@ -107,7 +107,7 @@ body{
 
 .panel{
   border-radius: 20px;
-  overflow:hidden;
+  overflow:visible;
 }
 
 .panel__head{
@@ -270,12 +270,12 @@ body{
 .actions{display:flex; gap:10px; justify-content:flex-end; flex-wrap:wrap}
 
 /* Table */
-.table-wrap{padding: 0 16px 16px; overflow:auto}
+.table-wrap{padding: 0 16px 16px; overflow:visible}
 .table{
   width:100%;
   border-collapse: separate;
   border-spacing: 0;
-  overflow:hidden;
+  overflow:visible;
   border-radius: 16px;
   border: 1px solid var(--border);
 }
@@ -419,7 +419,7 @@ input, select, textarea{
    ========================= */
 
 .table-wrap{
-  overflow: auto;
+  overflow: visible;
   border-radius: 16px;
 }
 
@@ -463,4 +463,177 @@ input, select, textarea{
 .topbar{
   border-radius: 18px;
   padding: 10px 12px;
+}
+/* =========================
+   AVISOS - mejor estética
+   ========================= */
+.avisos-control{
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.avisos-control .aviso-badge{
+  min-width: 42px;
+  height: 34px;
+  padding: 0 12px;
+  font-size: 13px;
+  margin-right: 0; /* tu .badge trae margin-right: 6px */
+}
+
+.avisos-control .btn-avisos{
+  min-width: 34px;
+  height: 34px;
+  border-radius: 999px; /* que se vea “pill” */
+  padding: 0;
+  font-size: 16px;
+  line-height: 1;
+}
+
+/* reduce el espacio vertical dentro de la celda */
+.table tbody td{ padding-top: 10px; padding-bottom: 10px; }
+
+
+/* =========================
+   MENU ACCIONES (⋯) — FIX FINAL
+   ========================= */
+
+/* contenedor */
+.actions-menu{
+  position: relative;
+  display: inline-flex;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+/* botón ⋯ */
+.actions-menu__trigger{
+  min-width: 46px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* panel */
+.actions-menu__panel{
+  position: absolute;
+  right: 0;
+  top: calc(100% + 10px);
+  min-width: 190px;
+  padding: 8px;
+  border-radius: 16px;
+
+  border: 1px solid var(--border);
+  background: linear-gradient(180deg, rgba(20,22,32,.92), rgba(20,22,32,.78));
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 18px 45px rgba(0,0,0,.45);
+
+  display: none;
+  z-index: 999999;
+}
+
+/* flechita */
+.actions-menu__panel::before{
+  content:"";
+  position:absolute;
+  right: 18px;
+  top: -7px;
+  width: 14px;
+  height: 14px;
+  background: rgba(20,22,32,.92);
+  border-left: 1px solid var(--border);
+  border-top: 1px solid var(--border);
+  transform: rotate(45deg);
+}
+
+.actions-menu.is-open .actions-menu__panel{ display:block; }
+
+/* =========================
+   ITEM (A y BUTTON iguales)
+   ========================= */
+.actions-menu__item,
+.actions-menu__item:link,
+.actions-menu__item:visited{
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  padding: 10px 12px;
+  border-radius: 12px;
+
+  font-weight: 900;
+  letter-spacing: .08em;
+  font-size: 12px;
+
+  color: rgba(255,255,255,.92);
+  background: transparent;
+  border: 0;
+
+  text-decoration: none;     /* quita subrayado */
+  cursor: pointer;
+  appearance: none;          /* quita look default */
+  -webkit-appearance: none;
+}
+
+/* hover */
+.actions-menu__item:hover{
+  background: rgba(255,255,255,.08);
+}
+
+/* focus accesible */
+.actions-menu__item:focus{
+  outline: none;
+}
+.actions-menu__item:focus-visible{
+  outline: 2px solid rgba(122,162,255,.55);
+  outline-offset: 2px;
+}
+
+/* separador suave entre items */
+.actions-menu__item + .actions-menu__item{
+  margin-top: 4px;
+}
+
+/* el form no debe meter márgenes */
+.actions-menu__form{ margin: 0; }
+
+/* peligro */
+.actions-menu__danger{
+  color: #ffb4b4 !important;
+}
+.actions-menu__danger:hover{
+  background: rgba(255, 80, 80, .14);
+}
+
+/* =========================
+   MODO CLARO
+   ========================= */
+html[data-theme="light"] .actions-menu__panel{
+  background: linear-gradient(180deg, rgba(255,255,255,.92), rgba(255,255,255,.78));
+  box-shadow: 0 18px 45px rgba(25,35,65,.18);
+}
+
+html[data-theme="light"] .actions-menu__panel::before{
+  background: rgba(255,255,255,.92);
+}
+
+html[data-theme="light"] .actions-menu__item,
+html[data-theme="light"] .actions-menu__item:link,
+html[data-theme="light"] .actions-menu__item:visited{
+  color: rgba(14,21,48,.92);
+}
+
+html[data-theme="light"] .actions-menu__item:hover{
+  background: rgba(15,25,55,.06);
+}
+
+html[data-theme="light"] .actions-menu__danger{
+  color: #b8001f !important;
+}
+html[data-theme="light"] .actions-menu__danger:hover{
+  background: rgba(184, 0, 31, .08);
 }

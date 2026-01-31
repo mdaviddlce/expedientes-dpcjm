@@ -125,3 +125,25 @@ document.addEventListener("click", async (e) => {
     btn.disabled = false;
   }
 });
+// ===============================
+// MENU ACCIONES (⋯)
+// ===============================
+document.addEventListener("click", (e) => {
+  // Click en botón ⋯
+  const trigger = e.target.closest(".actions-menu__trigger");
+
+  // Cierra todos los menús abiertos si haces click fuera
+  document.querySelectorAll(".actions-menu.is-open").forEach(menu => {
+    if (!menu.contains(e.target)) {
+      menu.classList.remove("is-open");
+    }
+  });
+
+  if (!trigger) return;
+
+  const menu = trigger.closest(".actions-menu");
+  if (!menu) return;
+
+  // Toggle del menú actual
+  menu.classList.toggle("is-open");
+});

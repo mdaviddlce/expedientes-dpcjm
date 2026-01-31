@@ -1,25 +1,68 @@
 from __future__ import annotations
 
 import os
+import re
 import sqlite3
+import zipfile
 from datetime import datetime, timezone
+from functools import wraps
 from io import BytesIO
 from pathlib import Path
-from functools import wraps
-import zipfile
 
 from flask import (
-    Flask, abort, flash, g, redirect, render_template, request,
-    send_file, session, url_for, jsonify
+    Flask,
+    abort,
+    flash,
+    g,
+    redirect,
+    render_template,
+    request,
+    send_file,
+    session,
+    url_for,
 )
-from werkzeug.security import generate_password_hash, check_password_hash
-
 from reportlab.lib.pagesizes import LETTER
-from reportlab.pdfgen import canvas
 from reportlab.lib.units import cm
+from reportlab.pdfgen import canvas
+from werkzeug.security import check_password_hash, generate_password_hash
 
-
+# =========================================================
+# CONFIG
+# =========================================================
 APP_DIR = Path(__file__).resolve().parent
+
+# Sufijo fijo del expediente
+SUFIJO = "DPCJM"
+
+def normalize_expediente_code(raw: str) -> str:
+    """
+    Normaliza a formato canonico:
+      NNNN/MMYY/DPCJM
+    Acepta:
+      "35/0126", "0035/0126/DPCJM", "35-0126-dpcjm", "35 / 0126"
+    """
+    s = (raw or "").strip().upper()
+    s = s.replace("-", "/").replace(" ", "")
+
+    parts = s.split("/")
+    if len(parts) < 2:
+        raise ValueError("FORMATO INVALIDO. USA: 0001/0126/DPCJM")
+
+    num_str = parts[0]
+    mmyy = parts[1]
+
+    if not num_str.isdigit():
+        raise ValueError("EL NUMERO DE EXPEDIENTE DEBE SER NUMERICO.")
+
+    num = int(num_str)
+    if num < 0 or num > 9999:
+        raise ValueError("NUMERO DE EXPEDIENTE FUERA DE RANGO (0-9999).")
+
+    if not re.fullmatch(r"\d{4}", mmyy):
+        raise ValueError("LA PARTE MMAA DEBE SER 4 DIGITOS (EJ. 0126).")
+
+    return f"{num:04d}/{mmyy}/{SUFIJO}"
+
 
 # --- ENV: DEV/PROD + DATA DIR ---
 DATA_DIR = Path(os.environ.get("EXPEDIENTES_DATA_DIR", "/Users/Shared/EXPEDIENTES_DPCJM/data"))
@@ -56,10 +99,9 @@ PRIVACY_NOTICE = (
     "personal, se entenderá que ha otorgado consentimiento para ello."
 )
 
-
-# -----------------------------
-# Utils
-# -----------------------------
+# =========================================================
+# UTILS
+# =========================================================
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
@@ -101,8 +143,16 @@ def current_role() -> str:
     return session.get("role", "")
 
 
-def audit(db: sqlite3.Connection, user_id: int | None, action: str, entity: str, entity_id: int | None,
-          field: str | None, old_value: str | None, new_value: str | None) -> None:
+def audit(
+    db: sqlite3.Connection,
+    user_id: int | None,
+    action: str,
+    entity: str,
+    entity_id: int | None,
+    field: str | None,
+    old_value: str | None,
+    new_value: str | None,
+) -> None:
     db.execute(
         """
         INSERT INTO audit_log (ts, user_id, action, entity, entity_id, field, old_value, new_value)
@@ -201,14 +251,16 @@ def init_db(app: Flask) -> None:
         add_column(cur, "expedientes", "updated_by INTEGER")
         add_column(cur, "expedientes", "updated_at TEXT")
         add_column(cur, "expedientes", "created_at TEXT")
-        add_column(cur, "expedientes", "apoderados TEXT")  # ✅ NUEVO CAMPO (para BDs existentes)
-        # Fill updated_at for old rows
-        cur.execute("UPDATE expedientes SET updated_at = COALESCE(updated_at, created_at, ?)", (utc_now(),))
+        add_column(cur, "expedientes", "apoderados TEXT")
+
+        # Rellena timestamps si vienen nulos
+        now = utc_now()
+        cur.execute("UPDATE expedientes SET created_at = COALESCE(created_at, ?)", (now,))
+        cur.execute("UPDATE expedientes SET updated_at = COALESCE(updated_at, created_at, ?)", (now,))
         db.commit()
 
 
 def ensure_default_admin() -> None:
-    # MUST be called inside app.app_context()
     db = get_db()
     exists = db.execute("SELECT 1 FROM users WHERE username='admin'").fetchone()
     if exists:
@@ -243,7 +295,7 @@ def compare_and_audit(db: sqlite3.Connection, user_id: int | None, expediente_id
 
 def draw_wrapped_text(c, text, x, y, max_width, line_height=12, font="Helvetica", font_size=9):
     c.setFont(font, font_size)
-    words = text.split()
+    words = (text or "").split()
     line = ""
     while words:
         w = words.pop(0)
@@ -251,8 +303,9 @@ def draw_wrapped_text(c, text, x, y, max_width, line_height=12, font="Helvetica"
         if c.stringWidth(test, font, font_size) <= max_width:
             line = test
         else:
-            c.drawString(x, y, line)
-            y -= line_height
+            if line:
+                c.drawString(x, y, line)
+                y -= line_height
             line = w
     if line:
         c.drawString(x, y, line)
@@ -338,9 +391,9 @@ def build_expediente_pdf_bytes(expediente, checklist, checklist_state) -> bytes:
     return buf.read()
 
 
-# -----------------------------
-# App
-# -----------------------------
+# =========================================================
+# APP
+# =========================================================
 def create_app() -> Flask:
     app = Flask(__name__, instance_relative_config=True)
     app.secret_key = os.environ.get("FLASK_SECRET_KEY", "CAMBIA-ESTO")
@@ -366,7 +419,7 @@ def create_app() -> Flask:
 
     @app.post("/login")
     def login_post():
-        username = (request.form.get("username") or "").strip()
+        username = (request.form.get("username") or "").strip().lower()
         password = (request.form.get("password") or "").strip()
 
         db = get_db()
@@ -392,9 +445,8 @@ def create_app() -> Flask:
         flash("SESION CERRADA.", "ok")
         return redirect(url_for("login_get"))
 
-
     # -------------------------
-    # USUARIOS (SOLO ADMIN)
+    # USUARIOS (ADMIN)
     # -------------------------
     @app.get("/users")
     @login_required
@@ -414,12 +466,7 @@ def create_app() -> Flask:
     @login_required
     @role_required(["ADMINISTRADOR"])
     def user_new():
-        return render_template(
-            "user_form.html",
-            mode="new",
-            roles=ROLES,
-            user=None,
-        )
+        return render_template("user_form.html", mode="new", roles=ROLES, user=None)
 
     @app.post("/users")
     @login_required
@@ -450,7 +497,6 @@ def create_app() -> Flask:
             (username, generate_password_hash(password), role, is_active, now),
         )
         new_id = db.execute("SELECT id FROM users WHERE username=?", (username,)).fetchone()["id"]
-
         audit(db, current_user_id(), "CREATE", "users", new_id, None, None, None)
         db.commit()
 
@@ -468,13 +514,7 @@ def create_app() -> Flask:
         ).fetchone()
         if not user:
             abort(404)
-
-        return render_template(
-            "user_form.html",
-            mode="edit",
-            roles=ROLES,
-            user=user,
-        )
+        return render_template("user_form.html", mode="edit", roles=ROLES, user=user)
 
     @app.post("/users/<int:user_id>")
     @login_required
@@ -489,39 +529,30 @@ def create_app() -> Flask:
         username = (f.get("username") or "").strip().lower()
         role = (f.get("role") or "").strip()
         is_active = 1 if (f.get("is_active") == "1") else 0
-        new_password = (f.get("password") or "").strip()  # opcional en edit
+        new_password = (f.get("password") or "").strip()
 
         if not username or role not in ROLES:
             flash("VERIFICA: USUARIO Y ROL.", "error")
             return redirect(url_for("user_edit", user_id=user_id))
 
-        # Evita duplicados de username
-        dupe = db.execute(
-            "SELECT 1 FROM users WHERE username=? AND id<>?",
-            (username, user_id),
-        ).fetchone()
+        dupe = db.execute("SELECT 1 FROM users WHERE username=? AND id<>?", (username, user_id)).fetchone()
         if dupe:
             flash("ESE USUARIO YA EXISTE.", "error")
             return redirect(url_for("user_edit", user_id=user_id))
 
-        # Evita que el admin se desactive a sí mismo
         if user_id == current_user_id() and is_active == 0:
             flash("NO PUEDES DESACTIVAR TU PROPIO USUARIO.", "error")
             return redirect(url_for("user_edit", user_id=user_id))
 
-        # Construye update dinámico (password solo si viene)
         sets = ["username=?", "role=?", "is_active=?"]
         vals = [username, role, is_active]
-
         if new_password:
             sets.append("password_hash=?")
             vals.append(generate_password_hash(new_password))
-
         vals.append(user_id)
 
         db.execute(f"UPDATE users SET {', '.join(sets)} WHERE id=?", vals)
 
-        # Auditoría campo a campo
         if (old["username"] or "") != username:
             audit(db, current_user_id(), "UPDATE", "users", user_id, "username", str(old["username"] or ""), username)
         if (old["role"] or "") != role:
@@ -535,6 +566,32 @@ def create_app() -> Flask:
         flash("USUARIO ACTUALIZADO.", "ok")
         return redirect(url_for("users_list"))
 
+    @app.post("/users/<int:user_id>/eliminar")
+    @login_required
+    @role_required(["ADMINISTRADOR"])
+    def user_delete(user_id: int):
+        db = get_db()
+        u = db.execute("SELECT id, username FROM users WHERE id=?", (user_id,)).fetchone()
+        if not u:
+            abort(404)
+
+        if user_id == current_user_id():
+            flash("NO PUEDES ELIMINAR TU PROPIO USUARIO.", "error")
+            return redirect(url_for("users_list"))
+
+        audit(db, current_user_id(), "DELETE", "users", user_id, None, None, f"USER:{u['username']}")
+        db.commit()
+
+        # Evita romper FKs
+        db.execute("UPDATE expedientes SET created_by=NULL WHERE created_by=?", (user_id,))
+        db.execute("UPDATE expedientes SET updated_by=NULL WHERE updated_by=?", (user_id,))
+        db.execute("UPDATE audit_log SET user_id=NULL WHERE user_id=?", (user_id,))
+
+        db.execute("DELETE FROM users WHERE id=?", (user_id,))
+        db.commit()
+
+        flash("USUARIO ELIMINADO PERMANENTEMENTE.", "ok")
+        return redirect(url_for("users_list"))
 
     # -------------------------
     # INDEX
@@ -544,6 +601,9 @@ def create_app() -> Flask:
     def index():
         q = (request.args.get("q") or "").strip()
         year = (request.args.get("year") or "").strip()
+        sort = (request.args.get("sort") or "desc").strip().lower()  # asc|desc
+
+        sort_dir = "ASC" if sort == "asc" else "DESC"
 
         db = get_db()
         sql = """
@@ -553,19 +613,30 @@ def create_app() -> Flask:
         WHERE 1=1
         """
         params: list[str] = []
+
         if q:
             sql += """
               AND (
-                expediente_code LIKE ? OR inmueble_nombre LIKE ? OR representante_legal LIKE ? OR apoderados LIKE ? OR domicilio_inspeccion LIKE ?
+                expediente_code LIKE ? OR inmueble_nombre LIKE ? OR representante_legal LIKE ?
+                OR apoderados LIKE ? OR domicilio_inspeccion LIKE ? OR telefono LIKE ?
               )
             """
             like = f"%{q}%"
-            params += [like, like, like, like, like]
+            params += [like, like, like, like, like, like]
+
         if year:
             sql += " AND strftime('%Y', created_at) = ?"
             params.append(year)
 
-        sql += " ORDER BY datetime(created_at) DESC"
+        # Orden por NUMERO (0001, 0002...) desde expediente_code:
+        # substr(expediente_code,1,4) -> "0001"
+        # Nota: asume formato canonico. Si no, tu normalizador lo debe asegurar al guardar.
+        sql += f"""
+        ORDER BY
+          CAST(substr(expediente_code, 1, 4) AS INTEGER) {sort_dir},
+          datetime(created_at) DESC
+        """
+
         rows = db.execute(sql, params).fetchall()
 
         years = db.execute(
@@ -603,10 +674,10 @@ def create_app() -> Flask:
     def expediente_create():
         form = request.form
 
-        expediente_code = (form.get("expediente_code") or "").strip()
+        raw_code = (form.get("expediente_code") or "").strip()
         inmueble_nombre = (form.get("inmueble_nombre") or "").strip()
         representante_legal = (form.get("representante_legal") or "").strip()
-        apoderados = (form.get("apoderados") or "").strip()  # ✅ NUEVO
+        apoderados = (form.get("apoderados") or "").strip()
         domicilio_inspeccion = (form.get("domicilio_inspeccion") or "").strip()
         telefono = (form.get("telefono") or "").strip()
         quien_solicita = (form.get("quien_solicita") or "").strip()
@@ -615,8 +686,14 @@ def create_app() -> Flask:
         if archivo_fisico and archivo_fisico not in ARCHIVO_FISICO_OPTIONS:
             archivo_fisico = ""
 
-        if not expediente_code or not inmueble_nombre or quien_solicita not in WHO_OPTIONS:
+        if not raw_code or not inmueble_nombre or quien_solicita not in WHO_OPTIONS:
             flash("VERIFICA: EXPEDIENTE, NOMBRE DEL INMUEBLE Y QUIEN SOLICITA.", "error")
+            return redirect(url_for("expediente_new"))
+
+        try:
+            expediente_code = normalize_expediente_code(raw_code)
+        except ValueError as e:
+            flash(str(e), "error")
             return redirect(url_for("expediente_new"))
 
         now = utc_now()
@@ -660,8 +737,8 @@ def create_app() -> Flask:
                 (expediente_id, item["id"], status_db),
             )
 
-        db.commit()
         audit(db, user_id, "CREATE", "expedientes", expediente_id, None, None, None)
+        db.commit()
 
         flash("EXPEDIENTE CREADO.", "ok")
         return redirect(url_for("expediente_view", expediente_id=expediente_id))
@@ -723,10 +800,10 @@ def create_app() -> Flask:
             flash("QUIEN SOLICITA INVALIDO.", "error")
             return redirect(url_for("expediente_edit", expediente_id=expediente_id))
 
-        expediente_code = (form.get("expediente_code") or "").strip()
+        raw_code = (form.get("expediente_code") or "").strip()
         inmueble_nombre = (form.get("inmueble_nombre") or "").strip()
         representante_legal = (form.get("representante_legal") or "").strip()
-        apoderados = (form.get("apoderados") or "").strip()  # ✅ NUEVO
+        apoderados = (form.get("apoderados") or "").strip()
         domicilio_inspeccion = (form.get("domicilio_inspeccion") or "").strip()
         telefono = (form.get("telefono") or "").strip()
         archivo_fisico = (form.get("archivo_fisico") or "").strip()
@@ -734,8 +811,14 @@ def create_app() -> Flask:
         if archivo_fisico and archivo_fisico not in ARCHIVO_FISICO_OPTIONS:
             archivo_fisico = ""
 
-        if not expediente_code or not inmueble_nombre:
+        if not raw_code or not inmueble_nombre:
             flash("VERIFICA: EXPEDIENTE Y NOMBRE DEL INMUEBLE.", "error")
+            return redirect(url_for("expediente_edit", expediente_id=expediente_id))
+
+        try:
+            expediente_code = normalize_expediente_code(raw_code)
+        except ValueError as e:
+            flash(str(e), "error")
             return redirect(url_for("expediente_edit", expediente_id=expediente_id))
 
         now = utc_now()
@@ -765,16 +848,22 @@ def create_app() -> Flask:
             ),
         )
 
-        compare_and_audit(db, user_id, expediente_id, old, {
-            "expediente_code": expediente_code,
-            "inmueble_nombre": inmueble_nombre,
-            "representante_legal": representante_legal,
-            "apoderados": apoderados,
-            "domicilio_inspeccion": domicilio_inspeccion,
-            "telefono": telefono,
-            "quien_solicita": quien_solicita,
-            "archivo_fisico": archivo_fisico,
-        })
+        compare_and_audit(
+            db,
+            user_id,
+            expediente_id,
+            old,
+            {
+                "expediente_code": expediente_code,
+                "inmueble_nombre": inmueble_nombre,
+                "representante_legal": representante_legal,
+                "apoderados": apoderados,
+                "domicilio_inspeccion": domicilio_inspeccion,
+                "telefono": telefono,
+                "quien_solicita": quien_solicita,
+                "archivo_fisico": archivo_fisico,
+            },
+        )
 
         for item in load_checklist_items():
             key = f"item_{item['id']}"
@@ -788,20 +877,20 @@ def create_app() -> Flask:
             old_status = old_row["status"] if old_row else None
 
             db.execute(
-                """
-                UPDATE expediente_checklist
-                SET status = ?
-                WHERE expediente_id = ? AND item_id = ?
-                """,
+                "UPDATE expediente_checklist SET status=? WHERE expediente_id=? AND item_id=?",
                 (status_db, expediente_id, item["id"]),
             )
 
             if old_status != status_db:
                 audit(
-                    db, user_id, "UPDATE", "expediente_checklist", expediente_id,
+                    db,
+                    user_id,
+                    "UPDATE",
+                    "expediente_checklist",
+                    expediente_id,
                     f"ITEM:{item['label']}",
                     str(old_status) if old_status is not None else "",
-                    str(status_db) if status_db is not None else ""
+                    str(status_db) if status_db is not None else "",
                 )
 
         db.commit()
@@ -813,22 +902,22 @@ def create_app() -> Flask:
     @role_required(["CAPTURA", "ADMINISTRADOR"])
     def expediente_delete(expediente_id: int):
         db = get_db()
-        exists = db.execute("SELECT id FROM expedientes WHERE id=?", (expediente_id,)).fetchone()
-        if not exists:
+        exp = db.execute("SELECT id, expediente_code FROM expedientes WHERE id=?", (expediente_id,)).fetchone()
+        if not exp:
             abort(404)
 
-        user_id = current_user_id()
-        audit(db, user_id, "DELETE", "expedientes", expediente_id, None, None, None)
-
-        db.execute("DELETE FROM expediente_checklist WHERE expediente_id = ?", (expediente_id,))
-        db.execute("DELETE FROM expedientes WHERE id = ?", (expediente_id,))
+        audit(db, current_user_id(), "DELETE", "expedientes", expediente_id, None, None, f"EXP:{exp['expediente_code']}")
         db.commit()
 
-        flash("EXPEDIENTE ELIMINADO.", "ok")
+        # checklist tiene ON DELETE CASCADE -> basta borrar expedientes
+        db.execute("DELETE FROM expedientes WHERE id=?", (expediente_id,))
+        db.commit()
+
+        flash("EXPEDIENTE ELIMINADO PERMANENTEMENTE.", "ok")
         return redirect(url_for("index"))
 
     # -----------------------------
-    # Verificaciones / Avisos
+    # VERIFICACIONES / AVISOS (+/-)
     # -----------------------------
     @app.post("/expedientes/<int:expediente_id>/verificaciones/inc")
     @login_required
@@ -852,13 +941,12 @@ def create_app() -> Flask:
         audit(db, user_id, "UPDATE", "expedientes", expediente_id, "verificaciones", str(old_v), str(new_v))
         db.commit()
 
-        # ✅ Si viene de AJAX (fetch), NO redirijas
+        # Si es fetch (AJAX), no redirigir
         if request.headers.get("X-Requested-With") == "fetch":
-            return jsonify({"ok": True, "verificaciones": new_v})
+            return ("", 204)
 
-        flash("VERIFICACION/AVISO AGREGADO.", "ok")
+        flash("VERIFICACION/AVISO REGISTRADO.", "ok")
         return redirect(url_for("expediente_view", expediente_id=expediente_id))
-
 
     @app.post("/expedientes/<int:expediente_id>/verificaciones/dec")
     @login_required
@@ -882,15 +970,14 @@ def create_app() -> Flask:
         audit(db, user_id, "UPDATE", "expedientes", expediente_id, "verificaciones", str(old_v), str(new_v))
         db.commit()
 
-        # ✅ Si viene de AJAX (fetch), NO redirijas
         if request.headers.get("X-Requested-With") == "fetch":
-            return jsonify({"ok": True, "verificaciones": new_v})
-        
-        flash("VERIFICACION/AVISO REMOVIDO.", "ok")
+            return ("", 204)
+
+        flash("VERIFICACION/AVISO AJUSTADO.", "ok")
         return redirect(url_for("expediente_view", expediente_id=expediente_id))
 
     # -----------------------------
-    # PDF Individual
+    # PDF INDIVIDUAL
     # -----------------------------
     @app.get("/expedientes/<int:expediente_id>/pdf")
     @login_required
@@ -902,7 +989,6 @@ def create_app() -> Flask:
 
         checklist = load_checklist_items()
         checklist_state = load_checklist_state(expediente_id)
-
         pdf_bytes = build_expediente_pdf_bytes(expediente, checklist, checklist_state)
 
         safe_code = (expediente["expediente_code"] or "EXPEDIENTE").replace("/", "-")
@@ -910,7 +996,7 @@ def create_app() -> Flask:
         return send_file(BytesIO(pdf_bytes), as_attachment=True, download_name=filename, mimetype="application/pdf")
 
     # -----------------------------
-    # ZIP Multi-PDF
+    # ZIP MULTI-PDF
     # -----------------------------
     @app.post("/expedientes/pdfs.zip")
     @login_required
@@ -924,7 +1010,7 @@ def create_app() -> Flask:
         db = get_db()
         rows = db.execute(
             f"SELECT * FROM expedientes WHERE id IN ({','.join(['?'] * len(ids))})",
-            ids
+            ids,
         ).fetchall()
 
         buf = BytesIO()
@@ -933,7 +1019,6 @@ def create_app() -> Flask:
                 exp_id = exp["id"]
                 checklist = load_checklist_items()
                 checklist_state = load_checklist_state(exp_id)
-
                 pdf_bytes = build_expediente_pdf_bytes(exp, checklist, checklist_state)
                 safe_code = (exp["expediente_code"] or f"EXP-{exp_id}").replace("/", "-")
                 z.writestr(f"{safe_code}.pdf", pdf_bytes)

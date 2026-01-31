@@ -33,8 +33,16 @@
             <td class="mono">{{ (r["created_at"] or "")[:10] }}</td>
             <td class="right">
               <a class="btn btn--ghost btn--sm" href="{{ url_for('user_edit', user_id=r['id']) }}">EDITAR</a>
+              <form method="post"
+                    action="{{ url_for('user_delete', user_id=r['id']) }}"
+                    class="inline"
+                    onsubmit="return confirm('ESTO BORRARA EL USUARIO PERMANENTEMENTE. ¿DESEAS CONTINUAR?');">
+                <button class="btn btn--danger btn--ghost" type="submit">ELIMINAR</button>
+              </form>
             </td>
+            
           </tr>
+          
         {% endfor %}
         {% if rows|length == 0 %}
           <tr><td colspan="5" class="muted center">SIN USUARIOS.</td></tr>
