@@ -26,6 +26,9 @@ from reportlab.lib.units import cm
 from reportlab.pdfgen import canvas
 from werkzeug.security import check_password_hash, generate_password_hash
 
+import csv
+from io import StringIO
+
 # =========================================================
 # CONFIG
 # =========================================================
@@ -71,8 +74,13 @@ DB_PATH = DATA_DIR / ("expedientes_dev.db" if APP_ENV == "dev" else "expedientes
 DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 ROLES = ["LECTURA", "CAPTURA", "ADMINISTRADOR"]
-WHO_OPTIONS = ["Propietario", "Apoderado", "Operador"]
-ARCHIVO_FISICO_OPTIONS = ["Archivo 1", "Archivo 2", "Archivo 3", "Archivo 4"]
+WHO_OPTIONS = ["Propietario", "Apoderado", "Operativo", "Tramite En Oficina"]
+ARCHIVO_FISICO_OPTIONS = [
+    "Transparencia",
+    "Pendientes",
+    "Archivo 09318",
+    "Archivo Gris",
+]
 
 CHECKLIST_DEFAULT = [
     "SOLICITUD",
@@ -1026,8 +1034,70 @@ def create_app() -> Flask:
         buf.seek(0)
         return send_file(buf, as_attachment=True, download_name="expedientes_pdfs.zip", mimetype="application/zip")
 
-    return app
+    
 
+    @app.post("/expedientes/lista.csv")
+    @login_required
+    def expedientes_lista():
+        ids = request.form.getlist("expediente_ids")
+        ids = [int(i) for i in ids if str(i).isdigit()]
+
+        if not ids:
+            flash("SELECCIONA AL MENOS UN EXPEDIENTE.", "error")
+            return redirect(url_for("index"))
+
+        db = get_db()
+        rows = db.execute(
+            f"""
+            SELECT
+            expediente_code,
+            inmueble_nombre,
+            representante_legal,
+            apoderados,
+            domicilio_inspeccion,
+            telefono,
+            quien_solicita
+            FROM expedientes
+            WHERE id IN ({",".join(["?"] * len(ids))})
+            ORDER BY expediente_code ASC
+            """,
+            ids,
+        ).fetchall()
+
+        # CSV en memoria (UTF-8 con BOM para Excel)
+        sio = StringIO()
+        w = csv.writer(sio)
+
+        w.writerow([
+            "NUMERO DE EXPEDIENTE",
+            "NOMBRE DEL INMUEBLE",
+            "REPRESENTANTE LEGAL",
+            "APODERADOS",
+            "DOMICILIO DE LA INSPECCION",
+            "TELEFONO",
+            "QUIEN SOLICITA",
+        ])
+
+        for r in rows:
+            w.writerow([
+                r["expediente_code"] or "",
+                r["inmueble_nombre"] or "",
+                r["representante_legal"] or "",
+                r["apoderados"] or "",
+                r["domicilio_inspeccion"] or "",
+                r["telefono"] or "",
+                r["quien_solicita"] or "",
+            ])
+
+        data = sio.getvalue().encode("utf-8-sig")  # BOM para Excel
+        return send_file(
+            BytesIO(data),
+            as_attachment=True,
+            download_name="expedientes_lista.csv",
+            mimetype="text/csv; charset=utf-8",
+        )
+
+    return app
 
 if __name__ == "__main__":
     app = create_app()

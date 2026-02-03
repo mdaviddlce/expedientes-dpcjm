@@ -11,8 +11,18 @@
     </div>
 
     <div class="row">
-      <form id="zipForm" method="post" action="{{ url_for('expedientes_zip') }}" class="inline">
-        <button class="btn btn--ghost" type="submit">DESCARGAR PDFS</button>
+      <form id="bulkForm" method="post" class="inline">
+        <button class="btn btn--ghost"
+                type="submit"
+                formaction="{{ url_for('expedientes_zip') }}">
+          DESCARGAR PDFS
+        </button>
+
+        <button class="btn btn--ghost"
+                type="submit"
+                formaction="{{ url_for('expedientes_lista') }}">
+          DESCARGAR LISTA
+        </button>
       </form>
 
       {% if session.get("role") in ["CAPTURA","ADMINISTRADOR"] %}
@@ -106,7 +116,7 @@
               data-mm="{{ mm }}"
               data-yy="{{ yy }}">
             <td class="center">
-              <input type="checkbox" name="expediente_ids" value="{{ r['id'] }}" form="zipForm">
+              <input type="checkbox" name="expediente_ids" value="{{ r['id'] }}" form="bulkForm">
             </td>
 
             <td class="mono">{{ r["expediente_code"] }}</td>
