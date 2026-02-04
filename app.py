@@ -29,6 +29,8 @@ from werkzeug.security import check_password_hash, generate_password_hash
 import csv
 from io import StringIO
 
+from reportlab.lib.utils import ImageReader
+
 # =========================================================
 # CONFIG
 # =========================================================
@@ -301,23 +303,47 @@ def compare_and_audit(db: sqlite3.Connection, user_id: int | None, expediente_id
             audit(db, user_id, "UPDATE", "expedientes", expediente_id, k, str(old_v or ""), str(new_v or ""))
 
 
-def draw_wrapped_text(c, text, x, y, max_width, line_height=12, font="Helvetica", font_size=9):
+def draw_justified_text(c, text, x, y, max_width, line_height=12, font="Helvetica", font_size=9):
     c.setFont(font, font_size)
-    words = (text or "").split()
-    line = ""
-    while words:
-        w = words.pop(0)
-        test = (line + " " + w).strip()
-        if c.stringWidth(test, font, font_size) <= max_width:
-            line = test
+
+    words = text.split()
+    line_words = []
+    lines = []
+
+    # Construye líneas que caben en el ancho
+    for word in words:
+        test_line = " ".join(line_words + [word])
+        if c.stringWidth(test_line, font, font_size) <= max_width:
+            line_words.append(word)
         else:
-            if line:
-                c.drawString(x, y, line)
-                y -= line_height
-            line = w
-    if line:
-        c.drawString(x, y, line)
+            lines.append(line_words)
+            line_words = [word]
+    if line_words:
+        lines.append(line_words)
+
+    # Dibuja líneas justificadas
+    for i, line in enumerate(lines):
+        if y < 5 * cm:
+            c.showPage()
+            c.setFont(font, font_size)
+            y = LETTER[1] - 2 * cm
+
+        # Última línea: alineada a la izquierda
+        if i == len(lines) - 1 or len(line) == 1:
+            c.drawString(x, y, " ".join(line))
+        else:
+            total_words_width = sum(c.stringWidth(w, font, font_size) for w in line)
+            space_count = len(line) - 1
+            extra_space = (max_width - total_words_width) / space_count
+
+            cursor_x = x
+            for w in line[:-1]:
+                c.drawString(cursor_x, y, w)
+                cursor_x += c.stringWidth(w, font, font_size) + extra_space
+            c.drawString(cursor_x, y, line[-1])
+
         y -= line_height
+
     return y
 
 
@@ -328,6 +354,33 @@ def build_expediente_pdf_bytes(expediente, checklist, checklist_state) -> bytes:
 
     x = 2 * cm
     y = height - 2 * cm
+    
+    # --- LOGO ---
+    logo_path = APP_DIR / "static" / "logo_pcjm.png"  # ajusta el nombre si es distinto
+    if logo_path.exists():
+        img = ImageReader(str(logo_path))
+
+        # Tamaño deseado (en puntos). 1 cm ≈ 28.35 pt
+        logo_w = 3.2 * cm
+        logo_h = 3.2 * cm
+
+        # Posición: centrado arriba, con margen
+        logo_x = (width - logo_w) / 2
+        logo_y = y - logo_h  # queda justo debajo del margen superior
+
+        c.drawImage(
+            img,
+            logo_x,
+            logo_y,
+            width=logo_w,
+            height=logo_h,
+            mask="auto",      # respeta transparencia si la tiene
+            preserveAspectRatio=True,
+            anchor="c",
+        )
+
+        # Baja el cursor para que el título no se encime con el logo
+        y = logo_y - 0.8 * cm
 
     year = (expediente["created_at"] or "")[:4] or "AAAA"
 
@@ -387,7 +440,16 @@ def build_expediente_pdf_bytes(expediente, checklist, checklist_state) -> bytes:
     c.setFont("Helvetica-Bold", 9)
     c.drawString(x, y, "AVISO DE PRIVACIDAD")
     y -= 0.6 * cm
-    y = draw_wrapped_text(c, PRIVACY_NOTICE, x, y, (width - 2 * x), line_height=11, font="Helvetica", font_size=9)
+    y = draw_justified_text(
+        c,
+        PRIVACY_NOTICE,
+        x,
+        y,
+        (width - 2 * x),
+        line_height=10,
+        font="Helvetica",
+        font_size=9
+    )
 
     y -= 0.6 * cm
     c.setFont("Helvetica", 9)
