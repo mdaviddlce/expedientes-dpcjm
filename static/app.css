@@ -575,8 +575,8 @@ input, select, textarea{
 
   text-decoration: none;     /* quita subrayado */
   cursor: pointer;
-  appearance: none;          /* quita look default */
   -webkit-appearance: none;
+  appearance: none;          /* quita look default */
 }
 
 /* hover */
@@ -636,4 +636,103 @@ html[data-theme="light"] .actions-menu__danger{
 }
 html[data-theme="light"] .actions-menu__danger:hover{
   background: rgba(184, 0, 31, .08);
+}
+
+/* Topbar hide on scroll */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  transition: transform 0.35s ease, opacity 0.25s ease;
+}
+
+/* Estado oculto */
+.topbar.is-hidden {
+  transform: translateY(-120%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* =========================
+   THEAD "GLASS" (BLUR) COMO TOPBAR
+   ========================= */
+
+/* IMPORTANTE: para que sticky + blur se vean bien */
+.table-wrap{ overflow: visible; }
+.table{ position: relative; }
+
+/* Encabezados fijos con blur */
+.table thead th{
+  position: sticky;
+  top: 0;
+  z-index: 10;
+
+  /* glass */
+  background: linear-gradient(180deg, var(--glass), var(--glass2));
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+
+  /* legibilidad */
+  border-bottom: 1px solid var(--border);
+  color: var(--muted);
+}
+
+/* (Opcional) si quieres que se note más el encabezado */
+.table thead th{
+  box-shadow: 0 10px 20px rgba(0,0,0,.06);
+}
+
+/* =========================
+   DOCUMENTOS – LAYOUT LIMPIO
+   ========================= */
+
+.documentos-form {
+  display: grid;
+  gap: 20px;
+}
+
+/* Grid de campos */
+.documentos-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px 20px;
+}
+
+/* En pantallas medianas */
+@media (max-width: 1100px) {
+  .documentos-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* En móvil */
+@media (max-width: 640px) {
+  .documentos-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Campos siempre del mismo tamaño */
+.documentos-grid .field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.documentos-grid input {
+  width: 100%;
+  height: 46px;
+}
+
+/* Botón abajo y centrado */
+.documentos-actions {
+  display: flex;
+  justify-content: center;
+  padding-top: 10px;
+}
+
+.documentos-actions .btn {
+  min-width: 180px;
+  height: 46px;
+  font-size: 13px;
 }

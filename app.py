@@ -6,9 +6,10 @@ import sqlite3
 import zipfile
 from datetime import datetime, timezone
 from functools import wraps
-from io import BytesIO
+from io import BytesIO, StringIO
 from pathlib import Path
 
+import csv
 from flask import (
     Flask,
     abort,
@@ -23,13 +24,9 @@ from flask import (
 )
 from reportlab.lib.pagesizes import LETTER
 from reportlab.lib.units import cm
+from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen import canvas
 from werkzeug.security import check_password_hash, generate_password_hash
-
-import csv
-from io import StringIO
-
-from reportlab.lib.utils import ImageReader
 
 # =========================================================
 # CONFIG
@@ -38,6 +35,7 @@ APP_DIR = Path(__file__).resolve().parent
 
 # Sufijo fijo del expediente
 SUFIJO = "DPCJM"
+
 
 def normalize_expediente_code(raw: str) -> str:
     """
@@ -76,7 +74,16 @@ DB_PATH = DATA_DIR / ("expedientes_dev.db" if APP_ENV == "dev" else "expedientes
 DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 ROLES = ["LECTURA", "CAPTURA", "ADMINISTRADOR"]
-WHO_OPTIONS = ["Propietario", "Apoderado", "Operativo", "Tramite En Oficina"]
+WHO_OPTIONS = [
+    "Propietario",
+    "Apoderado",
+    "Operativo",
+    "Tramite En Oficina",
+    "Representante Legal",
+    "Operativo Tortillero Seguro",
+    "Comandante",
+    "Operativo  Inmueble Seguro",
+]
 ARCHIVO_FISICO_OPTIONS = [
     "Transparencia",
     "Pendientes",
@@ -131,6 +138,7 @@ def login_required(fn):
         if not session.get("user_id"):
             return redirect(url_for("login_get"))
         return fn(*args, **kwargs)
+
     return wrapper
 
 
@@ -141,7 +149,9 @@ def role_required(allowed_roles: list[str]):
             if session.get("role") not in allowed_roles:
                 abort(403)
             return fn(*args, **kwargs)
+
         return wrapper
+
     return deco
 
 
@@ -263,6 +273,17 @@ def init_db(app: Flask) -> None:
         add_column(cur, "expedientes", "created_at TEXT")
         add_column(cur, "expedientes", "apoderados TEXT")
 
+        # --- NUEVAS COLUMNAS DOCUMENTOS ---
+        add_column(cur, "expedientes", "citatorio_fecha TEXT")
+        add_column(cur, "expedientes", "acta_inspeccion_folio TEXT")
+        add_column(cur, "expedientes", "acta_verificacion_fecha TEXT")
+        add_column(cur, "expedientes", "resolutivo_fecha TEXT")
+        add_column(cur, "expedientes", "ultimo_aviso_fecha TEXT")
+        add_column(cur, "expedientes", "segundo_aviso_fecha TEXT")
+        add_column(cur, "expedientes", "clausura_fecha TEXT")
+
+        db.commit()
+
         # Rellena timestamps si vienen nulos
         now = utc_now()
         cur.execute("UPDATE expedientes SET created_at = COALESCE(created_at, ?)", (now,))
@@ -306,11 +327,10 @@ def compare_and_audit(db: sqlite3.Connection, user_id: int | None, expediente_id
 def draw_justified_text(c, text, x, y, max_width, line_height=12, font="Helvetica", font_size=9):
     c.setFont(font, font_size)
 
-    words = text.split()
+    words = (text or "").split()
     line_words = []
     lines = []
 
-    # Construye líneas que caben en el ancho
     for word in words:
         test_line = " ".join(line_words + [word])
         if c.stringWidth(test_line, font, font_size) <= max_width:
@@ -321,14 +341,12 @@ def draw_justified_text(c, text, x, y, max_width, line_height=12, font="Helvetic
     if line_words:
         lines.append(line_words)
 
-    # Dibuja líneas justificadas
     for i, line in enumerate(lines):
         if y < 5 * cm:
             c.showPage()
             c.setFont(font, font_size)
             y = LETTER[1] - 2 * cm
 
-        # Última línea: alineada a la izquierda
         if i == len(lines) - 1 or len(line) == 1:
             c.drawString(x, y, " ".join(line))
         else:
@@ -354,19 +372,15 @@ def build_expediente_pdf_bytes(expediente, checklist, checklist_state) -> bytes:
 
     x = 2 * cm
     y = height - 2 * cm
-    
+
     # --- LOGO ---
-    logo_path = APP_DIR / "static" / "logo_pcjm.png"  # ajusta el nombre si es distinto
+    logo_path = APP_DIR / "static" / "logo_pcjm.png"  # ajusta nombre si es distinto
     if logo_path.exists():
         img = ImageReader(str(logo_path))
-
-        # Tamaño deseado (en puntos). 1 cm ≈ 28.35 pt
         logo_w = 3.2 * cm
         logo_h = 3.2 * cm
-
-        # Posición: centrado arriba, con margen
         logo_x = (width - logo_w) / 2
-        logo_y = y - logo_h  # queda justo debajo del margen superior
+        logo_y = y - logo_h
 
         c.drawImage(
             img,
@@ -374,12 +388,10 @@ def build_expediente_pdf_bytes(expediente, checklist, checklist_state) -> bytes:
             logo_y,
             width=logo_w,
             height=logo_h,
-            mask="auto",      # respeta transparencia si la tiene
+            mask="auto",
             preserveAspectRatio=True,
             anchor="c",
         )
-
-        # Baja el cursor para que el título no se encime con el logo
         y = logo_y - 0.8 * cm
 
     year = (expediente["created_at"] or "")[:4] or "AAAA"
@@ -440,16 +452,7 @@ def build_expediente_pdf_bytes(expediente, checklist, checklist_state) -> bytes:
     c.setFont("Helvetica-Bold", 9)
     c.drawString(x, y, "AVISO DE PRIVACIDAD")
     y -= 0.6 * cm
-    y = draw_justified_text(
-        c,
-        PRIVACY_NOTICE,
-        x,
-        y,
-        (width - 2 * x),
-        line_height=10,
-        font="Helvetica",
-        font_size=9
-    )
+    y = draw_justified_text(c, PRIVACY_NOTICE, x, y, (width - 2 * x), line_height=10, font="Helvetica", font_size=9)
 
     y -= 0.6 * cm
     c.setFont("Helvetica", 9)
@@ -652,10 +655,10 @@ def create_app() -> Flask:
         audit(db, current_user_id(), "DELETE", "users", user_id, None, None, f"USER:{u['username']}")
         db.commit()
 
-        # Evita romper FKs
         db.execute("UPDATE expedientes SET created_by=NULL WHERE created_by=?", (user_id,))
         db.execute("UPDATE expedientes SET updated_by=NULL WHERE updated_by=?", (user_id,))
         db.execute("UPDATE audit_log SET user_id=NULL WHERE user_id=?", (user_id,))
+        db.commit()
 
         db.execute("DELETE FROM users WHERE id=?", (user_id,))
         db.commit()
@@ -695,22 +698,27 @@ def create_app() -> Flask:
             params += [like, like, like, like, like, like]
 
         if year:
-            sql += " AND strftime('%Y', created_at) = ?"
-            params.append(year)
+            yy = year[2:4]  # "26" si year es "2026"
+            sql += " AND substr(expediente_code, 8, 2) = ?"
+            params.append(yy)
 
-        # Orden por NUMERO (0001, 0002...) desde expediente_code:
-        # substr(expediente_code,1,4) -> "0001"
-        # Nota: asume formato canonico. Si no, tu normalizador lo debe asegurar al guardar.
         sql += f"""
         ORDER BY
-          CAST(substr(expediente_code, 1, 4) AS INTEGER) {sort_dir},
+          CAST(substr(expediente_code, 8, 2) AS INTEGER) {sort_dir},  -- YY
+          CAST(substr(expediente_code, 6, 2) AS INTEGER) {sort_dir},  -- MM
+          CAST(substr(expediente_code, 1, 4) AS INTEGER) {sort_dir},  -- NNNN
           datetime(created_at) DESC
         """
 
         rows = db.execute(sql, params).fetchall()
 
         years = db.execute(
-            "SELECT DISTINCT strftime('%Y', created_at) AS y FROM expedientes ORDER BY y DESC"
+            """
+            SELECT DISTINCT ('20' || substr(expediente_code, 8, 2)) AS y
+            FROM expedientes
+            WHERE length(expediente_code) >= 9
+            ORDER BY y DESC
+            """
         ).fetchall()
 
         return render_template(
@@ -770,32 +778,41 @@ def create_app() -> Flask:
         user_id = current_user_id()
 
         db = get_db()
-        cur = db.execute(
-            """
-            INSERT INTO expedientes (
-              expediente_code, inmueble_nombre, representante_legal, apoderados,
-              domicilio_inspeccion, telefono, quien_solicita,
-              archivo_fisico,
-              verificaciones,
-              created_at, created_by, updated_at, updated_by
+
+        # IMPORTANTE: si quieres evitar duplicados, agrega UNIQUE en DB.
+        # (abajo te dejo el índice). Aquí solo capturamos el IntegrityError si existe.
+        try:
+            cur = db.execute(
+                """
+                INSERT INTO expedientes (
+                  expediente_code, inmueble_nombre, representante_legal, apoderados,
+                  domicilio_inspeccion, telefono, quien_solicita,
+                  archivo_fisico,
+                  verificaciones,
+                  created_at, created_by, updated_at, updated_by
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)
+                """,
+                (
+                    expediente_code,
+                    inmueble_nombre,
+                    representante_legal,
+                    apoderados,
+                    domicilio_inspeccion,
+                    telefono,
+                    quien_solicita,
+                    archivo_fisico,
+                    now,
+                    user_id,
+                    now,
+                    user_id,
+                ),
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)
-            """,
-            (
-                expediente_code,
-                inmueble_nombre,
-                representante_legal,
-                apoderados,
-                domicilio_inspeccion,
-                telefono,
-                quien_solicita,
-                archivo_fisico,
-                now,
-                user_id,
-                now,
-                user_id,
-            ),
-        )
+        except sqlite3.IntegrityError:
+            db.rollback()
+            flash("ESE NUMERO DE EXPEDIENTE YA EXISTE. VERIFICA EL CONSECUTIVO.", "error")
+            return redirect(url_for("expediente_new"))
+
         expediente_id = cur.lastrowid
 
         for item in load_checklist_items():
@@ -832,6 +849,86 @@ def create_app() -> Flask:
             checklist_state=checklist_state,
             can_edit=can_edit,
         )
+
+    @app.post("/expedientes/<int:expediente_id>/documentos")
+    @login_required
+    @role_required(["CAPTURA", "ADMINISTRADOR"])
+    def expediente_documentos_update(expediente_id: int):
+        db = get_db()
+        old = db.execute("SELECT * FROM expedientes WHERE id=?", (expediente_id,)).fetchone()
+        if not old:
+            abort(404)
+
+        f = request.form
+
+        def clean_date(name: str) -> str | None:
+            v = (f.get(name) or "").strip()
+            if not v:
+                return None
+            if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", v):
+                raise ValueError(f"FECHA INVALIDA EN {name}.")
+            return v
+
+        try:
+            citatorio_fecha = clean_date("citatorio_fecha")
+            acta_verificacion_fecha = clean_date("acta_verificacion_fecha")
+            resolutivo_fecha = clean_date("resolutivo_fecha")
+            ultimo_aviso_fecha = clean_date("ultimo_aviso_fecha")
+            segundo_aviso_fecha = clean_date("segundo_aviso_fecha")
+            clausura_fecha = clean_date("clausura_fecha")
+        except ValueError as e:
+            flash(str(e), "error")
+            return redirect(url_for("expediente_view", expediente_id=expediente_id))
+
+        acta_inspeccion_folio = (f.get("acta_inspeccion_folio") or "").strip().upper()
+
+        now = utc_now()
+        user_id = current_user_id()
+
+        db.execute(
+            """
+            UPDATE expedientes
+            SET citatorio_fecha=?,
+                acta_inspeccion_folio=?,
+                acta_verificacion_fecha=?,
+                resolutivo_fecha=?,
+                ultimo_aviso_fecha=?,
+                segundo_aviso_fecha=?,
+                clausura_fecha=?,
+                updated_at=?,
+                updated_by=?
+            WHERE id=?
+            """,
+            (
+                citatorio_fecha,
+                acta_inspeccion_folio or None,
+                acta_verificacion_fecha,
+                resolutivo_fecha,
+                ultimo_aviso_fecha,
+                segundo_aviso_fecha,
+                clausura_fecha,
+                now,
+                user_id,
+                expediente_id,
+            ),
+        )
+
+        def aud(col: str, newv):
+            oldv = old[col] if col in old.keys() else None
+            if (oldv or "") != (newv or ""):
+                audit(db, user_id, "UPDATE", "expedientes", expediente_id, col, str(oldv or ""), str(newv or ""))
+
+        aud("citatorio_fecha", citatorio_fecha or "")
+        aud("acta_inspeccion_folio", acta_inspeccion_folio or "")
+        aud("acta_verificacion_fecha", acta_verificacion_fecha or "")
+        aud("resolutivo_fecha", resolutivo_fecha or "")
+        aud("ultimo_aviso_fecha", ultimo_aviso_fecha or "")
+        aud("segundo_aviso_fecha", segundo_aviso_fecha or "")
+        aud("clausura_fecha", clausura_fecha or "")
+
+        db.commit()
+        flash("DOCUMENTOS ACTUALIZADOS.", "ok")
+        return redirect(url_for("expediente_view", expediente_id=expediente_id))
 
     @app.get("/expedientes/<int:expediente_id>/editar")
     @login_required
@@ -979,7 +1076,6 @@ def create_app() -> Flask:
         audit(db, current_user_id(), "DELETE", "expedientes", expediente_id, None, None, f"EXP:{exp['expediente_code']}")
         db.commit()
 
-        # checklist tiene ON DELETE CASCADE -> basta borrar expedientes
         db.execute("DELETE FROM expedientes WHERE id=?", (expediente_id,))
         db.commit()
 
@@ -1011,7 +1107,6 @@ def create_app() -> Flask:
         audit(db, user_id, "UPDATE", "expedientes", expediente_id, "verificaciones", str(old_v), str(new_v))
         db.commit()
 
-        # Si es fetch (AJAX), no redirigir
         if request.headers.get("X-Requested-With") == "fetch":
             return ("", 204)
 
@@ -1096,8 +1191,9 @@ def create_app() -> Flask:
         buf.seek(0)
         return send_file(buf, as_attachment=True, download_name="expedientes_pdfs.zip", mimetype="application/zip")
 
-    
-
+    # -----------------------------
+    # CSV LISTA (SELECCIONADOS)
+    # -----------------------------
     @app.post("/expedientes/lista.csv")
     @login_required
     def expedientes_lista():
@@ -1112,13 +1208,21 @@ def create_app() -> Flask:
         rows = db.execute(
             f"""
             SELECT
-            expediente_code,
-            inmueble_nombre,
-            representante_legal,
-            apoderados,
-            domicilio_inspeccion,
-            telefono,
-            quien_solicita
+              expediente_code,
+              inmueble_nombre,
+              representante_legal,
+              apoderados,
+              domicilio_inspeccion,
+              telefono,
+              quien_solicita,
+
+              citatorio_fecha,
+              acta_inspeccion_folio,
+              acta_verificacion_fecha,
+              resolutivo_fecha,
+              ultimo_aviso_fecha,
+              segundo_aviso_fecha,
+              clausura_fecha
             FROM expedientes
             WHERE id IN ({",".join(["?"] * len(ids))})
             ORDER BY expediente_code ASC
@@ -1126,30 +1230,47 @@ def create_app() -> Flask:
             ids,
         ).fetchall()
 
-        # CSV en memoria (UTF-8 con BOM para Excel)
         sio = StringIO()
         w = csv.writer(sio)
 
-        w.writerow([
-            "NUMERO DE EXPEDIENTE",
-            "NOMBRE DEL INMUEBLE",
-            "REPRESENTANTE LEGAL",
-            "APODERADOS",
-            "DOMICILIO DE LA INSPECCION",
-            "TELEFONO",
-            "QUIEN SOLICITA",
-        ])
+        w.writerow(
+            [
+                "NUMERO DE EXPEDIENTE",
+                "NOMBRE DEL INMUEBLE",
+                "REPRESENTANTE LEGAL",
+                "APODERADOS",
+                "DOMICILIO DE LA INSPECCION",
+                "TELEFONO",
+                "QUIEN SOLICITA",
+                "CITATORIO",
+                "NO. ACTA INSPECCION",
+                "ACTA VERIFICACION",
+                "RESOLUTIVO",
+                "ULTIMO AVISO",
+                "SEGUNDO AVISO ANTES DE CLAUSURA",
+                "CLAUSURA",
+            ]
+        )
 
         for r in rows:
-            w.writerow([
-                r["expediente_code"] or "",
-                r["inmueble_nombre"] or "",
-                r["representante_legal"] or "",
-                r["apoderados"] or "",
-                r["domicilio_inspeccion"] or "",
-                r["telefono"] or "",
-                r["quien_solicita"] or "",
-            ])
+            w.writerow(
+                [
+                    r["expediente_code"] or "",
+                    r["inmueble_nombre"] or "",
+                    r["representante_legal"] or "",
+                    r["apoderados"] or "",
+                    r["domicilio_inspeccion"] or "",
+                    r["telefono"] or "",
+                    r["quien_solicita"] or "",
+                    r["citatorio_fecha"] or "",
+                    r["acta_inspeccion_folio"] or "",
+                    r["acta_verificacion_fecha"] or "",
+                    r["resolutivo_fecha"] or "",
+                    r["ultimo_aviso_fecha"] or "",
+                    r["segundo_aviso_fecha"] or "",
+                    r["clausura_fecha"] or "",
+                ]
+            )
 
         data = sio.getvalue().encode("utf-8-sig")  # BOM para Excel
         return send_file(
@@ -1160,6 +1281,7 @@ def create_app() -> Flask:
         )
 
     return app
+
 
 if __name__ == "__main__":
     app = create_app()

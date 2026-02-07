@@ -72,6 +72,74 @@
       </table>
     </div>
 
+    <section class="panel glass">
+      <div class="panel__head">
+        <div>
+          <h2>DOCUMENTOS</h2>
+          <p class="muted">SELECCIONA FECHAS Y GUARDA.</p>
+        </div>
+      </div>
+
+      {% if can_edit %}
+      <form method="post"
+          action="{{ url_for('expediente_documentos_update', expediente_id=expediente['id']) }}"
+          class="documentos-form">
+
+      <div class="documentos-grid">
+        <!-- CAMPOS -->
+        <div class="field">
+          <label>CITATORIO</label>
+          <input type="date" name="citatorio_fecha" value="{{ expediente['citatorio_fecha'] or '' }}">
+        </div>
+
+        <div class="field">
+          <label>NO. ACTA INSPECCION</label>
+          <input type="text" name="acta_inspeccion_folio"
+                placeholder="AIR-025-DPCM-2026"
+                value="{{ expediente['acta_inspeccion_folio'] or '' }}">
+        </div>
+
+        <div class="field">
+          <label>ACTA VERIFICACION</label>
+          <input type="date" name="acta_verificacion_fecha"
+                value="{{ expediente['acta_verificacion_fecha'] or '' }}">
+        </div>
+
+        <div class="field">
+          <label>RESOLUTIVO</label>
+          <input type="date" name="resolutivo_fecha"
+                value="{{ expediente['resolutivo_fecha'] or '' }}">
+        </div>
+
+        <div class="field">
+          <label>ULTIMO AVISO</label>
+          <input type="date" name="ultimo_aviso_fecha"
+                value="{{ expediente['ultimo_aviso_fecha'] or '' }}">
+        </div>
+
+        <div class="field">
+          <label>SEGUNDO AVISO ANTES DE CLAUSURA</label>
+          <input type="date" name="segundo_aviso_fecha"
+                value="{{ expediente['segundo_aviso_fecha'] or '' }}">
+        </div>
+
+        <div class="field">
+          <label>CLAUSURA</label>
+          <input type="date" name="clausura_fecha"
+                value="{{ expediente['clausura_fecha'] or '' }}">
+        </div>
+      </div>
+
+      <!-- BOTÓN -->
+      <div class="documentos-actions">
+        <button class="btn" type="submit">GUARDAR</button>
+      </div>
+    </form>
+      {% else %}
+        <p class="muted">SOLO LECTURA.</p>
+      {% endif %}
+    </section>
+
     <div class="spacer"></div>
 
   </div>

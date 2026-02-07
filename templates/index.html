@@ -88,10 +88,8 @@
           {% set v = (r["verificaciones"] or 0)|int %}
           {% set sev = "ok" if v <= 1 else ("warn" if v == 2 else "bad") %}
 
-          {# año de created_at (para filtro) #}
           {% set y = (r["created_at"] or "")[:4] %}
 
-          {# para buscar en front si hiciera falta #}
           {% set search = (
               (r["expediente_code"] or "") ~ " " ~
               (r["inmueble_nombre"] or "") ~ " " ~
@@ -102,7 +100,6 @@
             )|lower
           %}
 
-          {# Orden por número: extrae 0001 (posición 0..3) y MMYY (pos 5..8) de 0001/0126/DPCJM #}
           {% set code = (r["expediente_code"] or "") %}
           {% set num4 = code[:4] %}
           {% set mmyy = code[5:9] %}
@@ -137,9 +134,9 @@
             </td>
 
             <td class="right">
-            <a class="btn btn--sm" href="{{ url_for('expediente_view', expediente_id=r['id']) }}">
+              <a class="btn btn--sm" href="{{ url_for('expediente_view', expediente_id=r['id']) }}">
                 ABRIR
-            </a>
+              </a>
             </td>
           </tr>
         {% endfor %}
@@ -151,51 +148,5 @@
     </table>
   </div>
 </section>
-
-<script>
-  // Select all para ZIP
-  const selectAll = document.getElementById("selectAll");
-  if (selectAll) {
-    selectAll.addEventListener("change", () => {
-      document.querySelectorAll('input[name="expediente_ids"]').forEach(cb => {
-        cb.checked = selectAll.checked;
-      });
-    });
-  }
-
-  // Orden en el FRONT por código (YY, MM, NNNN) para mostrar “por número”
-  // NOTA: esto solo controla la presentación. Tu BD puede quedarse ordenada como sea.
-  (function(){
-    const params = new URLSearchParams(window.location.search);
-    const sort = (params.get("sort") || "desc").trim(); // asc|desc
-
-    const tbody = document.getElementById("expBody");
-    const rows = Array.from(document.querySelectorAll(".rowExp"));
-
-    const toInt = (s) => {
-      const n = parseInt(s, 10);
-      return Number.isFinite(n) ? n : 0;
-    };
-
-    rows.sort((a,b) => {
-      // clave: YY, luego MM, luego NNNN
-      const ayy = toInt(a.dataset.yy);
-      const byy = toInt(b.dataset.yy);
-      if (ayy !== byy) return (sort === "asc") ? (ayy - byy) : (byy - ayy);
-
-      const amm = toInt(a.dataset.mm);
-      const bmm = toInt(b.dataset.mm);
-      if (amm !== bmm) return (sort === "asc") ? (amm - bmm) : (bmm - amm);
-
-      const anum = toInt(a.dataset.num);
-      const bnum = toInt(b.dataset.num);
-      if (anum !== bnum) return (sort === "asc") ? (anum - bnum) : (bnum - anum);
-
-      return 0;
-    });
-
-    rows.forEach(r => tbody.appendChild(r));
-  })();
-</script>
 
 {% endblock %}
