@@ -11,22 +11,29 @@
     </div>
 
     <div class="row">
-      <form id="bulkForm" method="post" class="inline">
-        <button class="btn btn--ghost"
+      <form id="bulkForm" method="post" class="inline icon-actions">
+        <button class="btn btn--icon"
                 type="submit"
-                formaction="{{ url_for('expedientes_zip') }}">
-          DESCARGAR PDFS
+                formaction="{{ url_for('expedientes_zip') }}"
+                title="Descargar PDFs seleccionados">
+          📄
         </button>
 
-        <button class="btn btn--ghost"
+        <button class="btn btn--icon"
                 type="submit"
-                formaction="{{ url_for('expedientes_lista') }}">
-          DESCARGAR LISTA
+                formaction="{{ url_for('expedientes_lista') }}"
+                title="Descargar lista (Excel)">
+          📋
         </button>
       </form>
 
       {% if session.get("role") in ["CAPTURA","ADMINISTRADOR"] %}
-        <a class="btn" href="{{ url_for('expediente_new') }}">+ NUEVO EXPEDIENTE</a>
+        <a class="btn btn--icon"
+          href="{{ url_for('expediente_new') }}"
+          title="NUEVO EXPEDIENTE"
+          aria-label="Nuevo expediente">
+          ➕
+        </a>
       {% endif %}
     </div>
   </div>
@@ -63,8 +70,21 @@
     </div>
 
     <div class="actions">
-      <button class="btn" type="submit">APLICAR</button>
-      <a class="btn btn--ghost" href="{{ url_for('index') }}">LIMPIAR</a>
+      <!-- APLICAR -->
+      <button class="btn btn--icon"
+              type="submit"
+              title="APLICAR FILTROS"
+              aria-label="Aplicar filtros">
+        🔍
+      </button>
+
+      <!-- LIMPIAR -->
+      <a class="btn btn--icon"
+        href="{{ url_for('index') }}"
+        title="LIMPIAR FILTROS"
+        aria-label="Limpiar filtros">
+        🧹
+      </a>
     </div>
   </form>
 
@@ -148,5 +168,15 @@
     </table>
   </div>
 </section>
+
+<!-- FOOTER -->
+  <footer class="footer glass">
+    <div class="footer__inner">
+      © {{ now().year if now else "2026" }}  
+      DEPARTAMENTO DE PROTECCION CIVIL · JESUS MARIA  
+      <span class="sep">•</span>
+      TODOS LOS DERECHOS RESERVADOS
+    </div>
+  </footer>
 
 {% endblock %}

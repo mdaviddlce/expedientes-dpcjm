@@ -69,11 +69,30 @@ body{
   margin:0;
   color:var(--text);
   font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+  background: transparent; /* IMPORTANTE: quitamos el fondo del body */
+  min-height: 100vh;
+  position: relative;
+}
+
+/* =========================
+   FONDO FIJO (SIN CORTES)
+   ========================= */
+
+body::before{
+  content:"";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+
   background:
     radial-gradient(1200px 700px at 15% 10%, rgba(122,162,255,.25), transparent 60%),
     radial-gradient(900px 600px at 80% 20%, rgba(255,140,180,.14), transparent 55%),
     radial-gradient(900px 650px at 60% 90%, rgba(90,255,210,.12), transparent 55%),
     linear-gradient(180deg, var(--bg), var(--bg2));
+
+  background-repeat: no-repeat;
+  background-size: cover;
 }
 
 /* Helpers */
@@ -735,4 +754,82 @@ html[data-theme="light"] .actions-menu__danger:hover{
   min-width: 180px;
   height: 46px;
   font-size: 13px;
+}
+
+.brand{ gap:12px; }
+
+.brand__logo{
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+  border-radius: 999px;
+  box-shadow: 0 0 0 6px rgba(122,162,255,.18);
+}
+
+@media (max-width: 640px){
+  .brand__logo{
+    width: 36px;
+    height: 36px;
+  }
+}
+
+/* ============================
+   BOTONES ICONO (DESCARGAS)
+   ============================ */
+
+.icon-actions{
+  display: flex;
+  gap: 8px;
+}
+
+
+.btn--icon{
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: 999px;
+  font-size: 20px;
+  font-weight: 900;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Hover más claro para acciones importantes */
+.btn--icon:hover{
+  transform: translateY(-1px) scale(1.05);
+}
+
+.btn--icon:active{
+  transform: translateY(0);
+}
+
+/* =========================
+   FOOTER
+   ========================= */
+
+.footer{
+  margin-top: 4rem;
+  padding: 1.2rem 0;
+  border-top: 1px solid var(--border);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  border-radius: 20px;
+}
+
+.footer__inner{
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 1rem;
+  text-align: center;
+  font-size: .78rem;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.footer .sep{
+  margin: 0 .5rem;
+  opacity: .6;
 }

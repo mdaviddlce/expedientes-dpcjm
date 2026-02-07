@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>{{ title or "EXPEDIENTES · DPCJM" }}</title>
+  <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
   <meta name="color-scheme" content="light dark">
 </head>
@@ -11,20 +12,21 @@
   <header class="topbar glass">
     <div class="topbar__left">
       <a class="brand" href="{{ url_for('index') }}">
-        <span class="brand__dot" aria-hidden="true"></span>
+        
+        <img class="brand__logo"
+        src="{{ url_for('static', filename='logo_pcjm.png') }}"
+        alt="PCJM">
+
         <span class="brand__text">
           <span class="brand__title">EXPEDIENTES</span>
           <span class="brand__sub">DEPARTAMENTO DE PROTECCION CIVIL · DPCJM</span>
+          <span class="brand__sub">{{ session.get("username") }} · {{ session.get("role") }}</span>
         </span>
       </a>
     </div>
 
     <div class="topbar__right">
       {% if session.get("user_id") %}
-        <div class="userpill">
-          <div class="userpill__name">{{ session.get("username") }}</div>
-          <div class="userpill__role">{{ session.get("role") }}</div>
-        </div>
 
         <!-- MODULO DE USUARIOS -->
         {% if session.get("role") == "ADMINISTRADOR" %}
@@ -33,7 +35,6 @@
 
         <button class="btn btn--ghost" id="themeToggle" type="button" title="Cambiar tema">
           <span class="icon" aria-hidden="true">🌓</span>
-          <span class="hide-sm">TEMA</span>
         </button>
 
         {% if session.get("role") in ["CAPTURA","ADMINISTRADOR"] %}
