@@ -101,6 +101,29 @@
           </div>
 
           <div class="field">
+            <label>INSPECCION</label>
+            <input type="text" name="inspeccion"
+                   placeholder="DESCRIPCION DE LA INSPECCION"
+                   value="{{ expediente['inspeccion'] or '' }}">
+          </div>
+
+          <div class="field">
+            <label>FECHA LÍMITE</label>
+            <input type="date" name="fecha_limite"
+                   id="fecha_limite_input"
+                   value="{{ expediente['fecha_limite'] or '' }}">
+          </div>
+
+          <div class="field">
+            <label>DÍAS RESTANTES</label>
+            <div id="dias_restantes_display"
+                 class="dias-restantes"
+                 data-fecha="{{ expediente['fecha_limite'] or '' }}">
+              —
+            </div>
+          </div>
+
+          <div class="field">
             <label>ACTA VERIFICACION</label>
             <input type="date" name="acta_verificacion_fecha"
                    value="{{ expediente['acta_verificacion_fecha'] or '' }}">
@@ -141,29 +164,6 @@
             <input type="date" name="pipc_fecha"
                    value="{{ expediente['pipc_fecha'] or '' }}">
           </div>
-
-          <div class="field">
-            <label>INSPECCION</label>
-            <input type="text" name="inspeccion"
-                   placeholder="DESCRIPCION DE LA INSPECCION"
-                   value="{{ expediente['inspeccion'] or '' }}">
-          </div>
-
-          <div class="field">
-            <label>FECHA LÍMITE</label>
-            <input type="date" name="fecha_limite"
-                   id="fecha_limite_input"
-                   value="{{ expediente['fecha_limite'] or '' }}">
-          </div>
-
-          <div class="field">
-            <label>DÍAS RESTANTES</label>
-            <div id="dias_restantes_display"
-                 class="dias-restantes"
-                 data-fecha="{{ expediente['fecha_limite'] or '' }}">
-              —
-            </div>
-          </div>
         </div>
 
         <div class="field field--full">
@@ -187,6 +187,24 @@
           <div class="field">
             <label>NO. ACTA INSPECCION</label>
             <input type="text" value="{{ expediente['acta_inspeccion_folio'] or '' }}" disabled>
+          </div>
+
+          <div class="field">
+            <label>INSPECCION</label>
+            <input type="text" value="{{ expediente['inspeccion'] or '' }}" disabled>
+          </div>
+
+          <div class="field">
+            <label>FECHA LÍMITE</label>
+            <input type="date" value="{{ expediente['fecha_limite'] or '' }}" disabled>
+          </div>
+
+          <div class="field">
+            <label>DÍAS RESTANTES</label>
+            <div class="dias-restantes"
+                 data-fecha="{{ expediente['fecha_limite'] or '' }}">
+              —
+            </div>
           </div>
 
           <div class="field">
@@ -222,24 +240,6 @@
           <div class="field">
             <label>PIPC</label>
             <input type="date" value="{{ expediente['pipc_fecha'] or '' }}" disabled>
-          </div>
-
-          <div class="field">
-            <label>INSPECCION</label>
-            <input type="text" value="{{ expediente['inspeccion'] or '' }}" disabled>
-          </div>
-
-          <div class="field">
-            <label>FECHA LÍMITE</label>
-            <input type="date" value="{{ expediente['fecha_limite'] or '' }}" disabled>
-          </div>
-
-          <div class="field">
-            <label>DÍAS RESTANTES</label>
-            <div class="dias-restantes"
-                 data-fecha="{{ expediente['fecha_limite'] or '' }}">
-              —
-            </div>
           </div>
         </div>
 
