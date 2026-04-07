@@ -121,8 +121,9 @@
           %}
 
           {% set code = (r["expediente_code"] or "") %}
+          {% set parts = code.split('/') %}
           {% set num4 = code[:4] %}
-          {% set mmyy = code[5:9] %}
+          {% set mmyy = parts[1] if parts|length > 1 else '' %}
           {% set mm = mmyy[:2] %}
           {% set yy = mmyy[2:4] %}
 

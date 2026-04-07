@@ -32,48 +32,15 @@ from werkzeug.security import check_password_hash, generate_password_hash
 # CONFIG
 # =========================================================
 APP_DIR = Path(__file__).resolve().parent
-
-# Sufijo fijo del expediente
 SUFIJO = "DPCJM"
 
-
-def normalize_expediente_code(raw: str) -> str:
-    """
-    Normaliza a formato canonico:
-      NNNN/MMYY/DPCJM
-    Acepta:
-      "35/0126", "0035/0126/DPCJM", "35-0126-dpcjm", "35 / 0126"
-    """
-    s = (raw or "").strip().upper()
-    s = s.replace("-", "/").replace(" ", "")
-
-    parts = s.split("/")
-    if len(parts) < 2:
-        raise ValueError("FORMATO INVALIDO. USA: 0001/0126/DPCJM")
-
-    num_str = parts[0]
-    mmyy = parts[1]
-
-    if not num_str.isdigit():
-        raise ValueError("EL NUMERO DE EXPEDIENTE DEBE SER NUMERICO.")
-
-    num = int(num_str)
-    if num < 0 or num > 9999:
-        raise ValueError("NUMERO DE EXPEDIENTE FUERA DE RANGO (0-9999).")
-
-    if not re.fullmatch(r"\d{4}", mmyy):
-        raise ValueError("LA PARTE MMAA DEBE SER 4 DIGITOS (EJ. 0126).")
-
-    return f"{num:04d}/{mmyy}/{SUFIJO}"
-
-
-# --- ENV: DEV/PROD + DATA DIR ---
 DATA_DIR = Path(os.environ.get("EXPEDIENTES_DATA_DIR", "/Users/Shared/EXPEDIENTES_DPCJM/data"))
-APP_ENV = os.environ.get("APP_ENV", "prod").lower()  # "prod" o "dev"
+APP_ENV = os.environ.get("APP_ENV", "prod").lower()
 DB_PATH = DATA_DIR / ("expedientes_dev.db" if APP_ENV == "dev" else "expedientes_prod.db")
 DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 ROLES = ["LECTURA", "CAPTURA", "ADMINISTRADOR"]
+
 WHO_OPTIONS = [
     "Propietario",
     "Apoderado",
@@ -84,6 +51,7 @@ WHO_OPTIONS = [
     "Comandante",
     "Operativo  Inmueble Seguro",
 ]
+
 ARCHIVO_FISICO_OPTIONS = [
     "Transparencia",
     "Pendientes",
@@ -116,9 +84,50 @@ PRIVACY_NOTICE = (
     "personal, se entenderá que ha otorgado consentimiento para ello."
 )
 
+
 # =========================================================
 # UTILS
 # =========================================================
+def normalize_expediente_code(raw: str) -> str:
+    """
+    Formatos permitidos:
+      NNNN/MMYY/DPCJM
+      NNNNA/MMYY/DPCJM
+
+    Ejemplos:
+      35/0126
+      35A/0126
+      0035/0126/DPCJM
+      0035A/0126/DPCJM
+    """
+    s = (raw or "").strip().upper()
+    s = s.replace("-", "/").replace(" ", "")
+
+    parts = s.split("/")
+    if len(parts) < 2:
+        raise ValueError("FORMATO INVALIDO. USA: 0001/0126/DPCJM")
+
+    num_part = parts[0]
+    mmyy = parts[1]
+
+    m = re.fullmatch(r"(\d{1,4})([A-Z]?)", num_part)
+    if not m:
+        raise ValueError("EL NUMERO DE EXPEDIENTE DEBE SER NUMERICO O NUMERO + LETRA (EJ: 1380A).")
+
+    num = int(m.group(1))
+    letra = m.group(2)
+
+    if num < 0 or num > 9999:
+        raise ValueError("NUMERO DE EXPEDIENTE FUERA DE RANGO (0-9999).")
+
+    if not re.fullmatch(r"\d{4}", mmyy):
+        raise ValueError("LA PARTE MMAA DEBE SER 4 DIGITOS (EJ. 0126).")
+
+    if letra:
+        return f"{num:04d}{letra}/{mmyy}/{SUFIJO}"
+    return f"{num:04d}/{mmyy}/{SUFIJO}"
+
+
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
@@ -256,14 +265,12 @@ def init_db(app: Flask) -> None:
             """
         )
 
-        # Seed checklist catalog if empty
         existing = db.execute("SELECT COUNT(*) AS c FROM checklist_items").fetchone()["c"]
         if existing == 0:
             for i, label in enumerate(CHECKLIST_DEFAULT, start=1):
                 db.execute("INSERT INTO checklist_items (label, sort_order) VALUES (?, ?)", (label, i))
             db.commit()
 
-        # --- MIGRATIONS (safe) ---
         cur = db.cursor()
         add_column(cur, "expedientes", "verificaciones INTEGER NOT NULL DEFAULT 0")
         add_column(cur, "expedientes", "archivo_fisico TEXT")
@@ -273,7 +280,6 @@ def init_db(app: Flask) -> None:
         add_column(cur, "expedientes", "created_at TEXT")
         add_column(cur, "expedientes", "apoderados TEXT")
 
-        # --- NUEVAS COLUMNAS DOCUMENTOS ---
         add_column(cur, "expedientes", "citatorio_fecha TEXT")
         add_column(cur, "expedientes", "acta_inspeccion_folio TEXT")
         add_column(cur, "expedientes", "acta_verificacion_fecha TEXT")
@@ -281,13 +287,23 @@ def init_db(app: Flask) -> None:
         add_column(cur, "expedientes", "ultimo_aviso_fecha TEXT")
         add_column(cur, "expedientes", "segundo_aviso_fecha TEXT")
         add_column(cur, "expedientes", "clausura_fecha TEXT")
+        add_column(cur, "expedientes", "vobo_fecha TEXT")
+        add_column(cur, "expedientes", "pipc_fecha TEXT")
+        add_column(cur, "expedientes", "observaciones TEXT")
+        add_column(cur, "expedientes", "inspeccion TEXT")
+        add_column(cur, "expedientes", "fecha_limite TEXT")
 
         db.commit()
 
-        # Rellena timestamps si vienen nulos
         now = utc_now()
         cur.execute("UPDATE expedientes SET created_at = COALESCE(created_at, ?)", (now,))
         cur.execute("UPDATE expedientes SET updated_at = COALESCE(updated_at, created_at, ?)", (now,))
+        db.commit()
+
+        cur.execute("""
+            CREATE UNIQUE INDEX IF NOT EXISTS ux_expedientes_expediente_code
+            ON expedientes(expediente_code)
+        """)
         db.commit()
 
 
@@ -373,8 +389,7 @@ def build_expediente_pdf_bytes(expediente, checklist, checklist_state) -> bytes:
     x = 2 * cm
     y = height - 2 * cm
 
-    # --- LOGO ---
-    logo_path = APP_DIR / "static" / "logo_pcjm.png"  # ajusta nombre si es distinto
+    logo_path = APP_DIR / "static" / "logo_pcjm.png"
     if logo_path.exists():
         img = ImageReader(str(logo_path))
         logo_w = 3.2 * cm
@@ -531,9 +546,6 @@ def create_app() -> Flask:
         flash("SESION CERRADA.", "ok")
         return redirect(url_for("login_get"))
 
-    # -------------------------
-    # USUARIOS (ADMIN)
-    # -------------------------
     @app.get("/users")
     @login_required
     @role_required(["ADMINISTRADOR"])
@@ -790,9 +802,11 @@ def create_app() -> Flask:
 
         years = db.execute(
             """
-            SELECT DISTINCT ('20' || substr(expediente_code, 8, 2)) AS y
+            SELECT DISTINCT (
+                '20' || substr(substr(expediente_code, instr(expediente_code, '/') + 1, 4), 3, 2)
+            ) AS y
             FROM expedientes
-            WHERE length(expediente_code) >= 9
+            WHERE instr(expediente_code, '/') > 0
             ORDER BY y DESC
             """
         ).fetchall()
@@ -809,9 +823,6 @@ def create_app() -> Flask:
             sort=sort,
         )
 
-    # -------------------------
-    # EXPEDIENTES
-    # -------------------------
     @app.get("/expedientes/nuevo")
     @login_required
     @role_required(["CAPTURA", "ADMINISTRADOR"])
@@ -856,19 +867,15 @@ def create_app() -> Flask:
 
         now = utc_now()
         user_id = current_user_id()
-
         db = get_db()
 
-        # IMPORTANTE: si quieres evitar duplicados, agrega UNIQUE en DB.
-        # (abajo te dejo el índice). Aquí solo capturamos el IntegrityError si existe.
         try:
             cur = db.execute(
                 """
                 INSERT INTO expedientes (
                   expediente_code, inmueble_nombre, representante_legal, apoderados,
                   domicilio_inspeccion, telefono, quien_solicita,
-                  archivo_fisico,
-                  verificaciones,
+                  archivo_fisico, verificaciones,
                   created_at, created_by, updated_at, updated_by
                 )
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)
@@ -956,11 +963,16 @@ def create_app() -> Flask:
             ultimo_aviso_fecha = clean_date("ultimo_aviso_fecha")
             segundo_aviso_fecha = clean_date("segundo_aviso_fecha")
             clausura_fecha = clean_date("clausura_fecha")
+            vobo_fecha = clean_date("vobo_fecha")
+            pipc_fecha = clean_date("pipc_fecha")
+            fecha_limite = clean_date("fecha_limite")
         except ValueError as e:
             flash(str(e), "error")
             return redirect(url_for("expediente_view", expediente_id=expediente_id))
 
         acta_inspeccion_folio = (f.get("acta_inspeccion_folio") or "").strip().upper()
+        observaciones = (f.get("observaciones") or "").strip()
+        inspeccion = (f.get("inspeccion") or "").strip().upper()
 
         now = utc_now()
         user_id = current_user_id()
@@ -975,6 +987,11 @@ def create_app() -> Flask:
                 ultimo_aviso_fecha=?,
                 segundo_aviso_fecha=?,
                 clausura_fecha=?,
+                vobo_fecha=?,
+                pipc_fecha=?,
+                observaciones=?,
+                inspeccion=?,
+                fecha_limite=?,
                 updated_at=?,
                 updated_by=?
             WHERE id=?
@@ -987,6 +1004,11 @@ def create_app() -> Flask:
                 ultimo_aviso_fecha,
                 segundo_aviso_fecha,
                 clausura_fecha,
+                vobo_fecha,
+                pipc_fecha,
+                observaciones,
+                inspeccion or None,
+                fecha_limite,
                 now,
                 user_id,
                 expediente_id,
@@ -1005,6 +1027,11 @@ def create_app() -> Flask:
         aud("ultimo_aviso_fecha", ultimo_aviso_fecha or "")
         aud("segundo_aviso_fecha", segundo_aviso_fecha or "")
         aud("clausura_fecha", clausura_fecha or "")
+        aud("vobo_fecha", vobo_fecha or "")
+        aud("pipc_fecha", pipc_fecha or "")
+        aud("observaciones", observaciones or "")
+        aud("inspeccion", inspeccion or "")
+        aud("fecha_limite", fecha_limite or "")
 
         db.commit()
         flash("DOCUMENTOS ACTUALIZADOS.", "ok")
@@ -1071,29 +1098,33 @@ def create_app() -> Flask:
         now = utc_now()
         user_id = current_user_id()
 
-        db.execute(
-            """
-            UPDATE expedientes
-            SET expediente_code = ?, inmueble_nombre = ?, representante_legal = ?, apoderados = ?,
-                domicilio_inspeccion = ?, telefono = ?, quien_solicita = ?,
-                archivo_fisico = ?,
-                updated_at = ?, updated_by = ?
-            WHERE id = ?
-            """,
-            (
-                expediente_code,
-                inmueble_nombre,
-                representante_legal,
-                apoderados,
-                domicilio_inspeccion,
-                telefono,
-                quien_solicita,
-                archivo_fisico,
-                now,
-                user_id,
-                expediente_id,
-            ),
-        )
+        try:
+            db.execute(
+                """
+                UPDATE expedientes
+                SET expediente_code = ?, inmueble_nombre = ?, representante_legal = ?, apoderados = ?,
+                    domicilio_inspeccion = ?, telefono = ?, quien_solicita = ?,
+                    archivo_fisico = ?, updated_at = ?, updated_by = ?
+                WHERE id = ?
+                """,
+                (
+                    expediente_code,
+                    inmueble_nombre,
+                    representante_legal,
+                    apoderados,
+                    domicilio_inspeccion,
+                    telefono,
+                    quien_solicita,
+                    archivo_fisico,
+                    now,
+                    user_id,
+                    expediente_id,
+                ),
+            )
+        except sqlite3.IntegrityError:
+            db.rollback()
+            flash("ESE NUMERO DE EXPEDIENTE YA EXISTE. NO SE PUEDE REPETIR.", "error")
+            return redirect(url_for("expediente_edit", expediente_id=expediente_id))
 
         compare_and_audit(
             db,
@@ -1162,9 +1193,6 @@ def create_app() -> Flask:
         flash("EXPEDIENTE ELIMINADO PERMANENTEMENTE.", "ok")
         return redirect(url_for("index"))
 
-    # -----------------------------
-    # VERIFICACIONES / AVISOS (+/-)
-    # -----------------------------
     @app.post("/expedientes/<int:expediente_id>/verificaciones/inc")
     @login_required
     @role_required(["CAPTURA", "ADMINISTRADOR"])
@@ -1221,9 +1249,6 @@ def create_app() -> Flask:
         flash("VERIFICACION/AVISO AJUSTADO.", "ok")
         return redirect(url_for("expediente_view", expediente_id=expediente_id))
 
-    # -----------------------------
-    # PDF INDIVIDUAL
-    # -----------------------------
     @app.get("/expedientes/<int:expediente_id>/pdf")
     @login_required
     def expediente_pdf(expediente_id: int):
@@ -1240,9 +1265,6 @@ def create_app() -> Flask:
         filename = f"{safe_code}.pdf"
         return send_file(BytesIO(pdf_bytes), as_attachment=True, download_name=filename, mimetype="application/pdf")
 
-    # -----------------------------
-    # ZIP MULTI-PDF
-    # -----------------------------
     @app.post("/expedientes/pdfs.zip")
     @login_required
     def expedientes_zip():
@@ -1271,9 +1293,6 @@ def create_app() -> Flask:
         buf.seek(0)
         return send_file(buf, as_attachment=True, download_name="expedientes_pdfs.zip", mimetype="application/zip")
 
-    # -----------------------------
-    # CSV LISTA (SELECCIONADOS)
-    # -----------------------------
     @app.post("/expedientes/lista.csv")
     @login_required
     def expedientes_lista():
@@ -1295,14 +1314,16 @@ def create_app() -> Flask:
               domicilio_inspeccion,
               telefono,
               quien_solicita,
-
               citatorio_fecha,
               acta_inspeccion_folio,
               acta_verificacion_fecha,
               resolutivo_fecha,
               ultimo_aviso_fecha,
               segundo_aviso_fecha,
-              clausura_fecha
+              clausura_fecha,
+              vobo_fecha,
+              pipc_fecha,
+              observaciones
             FROM expedientes
             WHERE id IN ({",".join(["?"] * len(ids))})
             ORDER BY expediente_code ASC
@@ -1329,6 +1350,9 @@ def create_app() -> Flask:
                 "ULTIMO AVISO",
                 "SEGUNDO AVISO ANTES DE CLAUSURA",
                 "CLAUSURA",
+                "VO BO",
+                "PIPC",
+                "OBSERVACIONES",
             ]
         )
 
@@ -1349,10 +1373,13 @@ def create_app() -> Flask:
                     r["ultimo_aviso_fecha"] or "",
                     r["segundo_aviso_fecha"] or "",
                     r["clausura_fecha"] or "",
+                    r["vobo_fecha"] or "",
+                    r["pipc_fecha"] or "",
+                    r["observaciones"] or "",
                 ]
             )
 
-        data = sio.getvalue().encode("utf-8-sig")  # BOM para Excel
+        data = sio.getvalue().encode("utf-8-sig")
         return send_file(
             BytesIO(data),
             as_attachment=True,
