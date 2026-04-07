@@ -1,0 +1,115 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<section class="panel glass">
+  <div class="panel__head">
+    <div>
+      <h2>BITÁCORA DE AUDITORÍA</h2>
+      <p class="muted">{{ total }} REGISTRO(S)</p>
+    </div>
+    <a class="btn btn--ghost" href="{{ url_for('users_list') }}">← USUARIOS</a>
+  </div>
+
+  <form class="toolbar" method="get" action="{{ url_for('audit_log_view') }}">
+    <div class="field">
+      <label>ENTIDAD</label>
+      <select name="entity">
+        <option value="">TODAS</option>
+        {% for e in entities %}
+          <option value="{{ e }}" {% if entity == e %}selected{% endif %}>{{ e }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="field">
+      <label>ACCIÓN</label>
+      <select name="action">
+        <option value="">TODAS</option>
+        {% for a in actions %}
+          <option value="{{ a }}" {% if action == a %}selected{% endif %}>{{ a }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="actions">
+      <button class="btn btn--icon" type="submit" title="FILTRAR">🔍</button>
+      <a class="btn btn--icon" href="{{ url_for('audit_log_view') }}" title="LIMPIAR">🧹</a>
+    </div>
+  </form>
+
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>FECHA / HORA</th>
+          <th>USUARIO</th>
+          <th>ACCIÓN</th>
+          <th>ENTIDAD</th>
+          <th>ID</th>
+          <th>CAMPO</th>
+          <th>ANTES</th>
+          <th>DESPUÉS</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+        <tr>
+          <td class="mono" style="white-space:nowrap">{{ r["ts"][:19].replace("T"," ") }}</td>
+          <td>{{ r["username"] or "—" }}</td>
+          <td>
+            {% if r["action"] == "CREATE" %}
+              <span class="badge badge--ok">CREAR</span>
+            {% elif r["action"] == "UPDATE" %}
+              <span class="badge badge--warn">EDITAR</span>
+            {% elif r["action"] == "DELETE" %}
+              <span class="badge badge--bad">ELIMINAR</span>
+            {% else %}
+              <span class="badge">{{ r["action"] }}</span>
+            {% endif %}
+          </td>
+          <td class="mono">{{ r["entity"] }}</td>
+          <td class="mono center">{{ r["entity_id"] or "—" }}</td>
+          <td class="mono">{{ r["field"] or "—" }}</td>
+          <td class="audit-val">{{ r["old_value"] or "—" }}</td>
+          <td class="audit-val">{{ r["new_value"] or "—" }}</td>
+        </tr>
+        {% endfor %}
+
+        {% if rows|length == 0 %}
+          <tr><td colspan="8" class="muted center">SIN REGISTROS.</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if total_pages > 1 %}
+  <div class="pagination">
+    {% if page > 1 %}
+      <a class="btn btn--ghost btn--sm"
+         href="{{ url_for('audit_log_view', entity=entity, action=action, page=page-1) }}">← ANT</a>
+    {% else %}
+      <span class="btn btn--ghost btn--sm disabled">← ANT</span>
+    {% endif %}
+
+    <span class="muted pagination__info">PÁG {{ page }} / {{ total_pages }}</span>
+
+    {% if page < total_pages %}
+      <a class="btn btn--ghost btn--sm"
+         href="{{ url_for('audit_log_view', entity=entity, action=action, page=page+1) }}">SIG →</a>
+    {% else %}
+      <span class="btn btn--ghost btn--sm disabled">SIG →</span>
+    {% endif %}
+  </div>
+  {% endif %}
+</section>
+
+<footer class="footer glass">
+  <div class="footer__inner">
+    © {{ now().year if now else "2026" }}
+    DEPARTAMENTO DE PROTECCION CIVIL · JESUS MARIA
+    <span class="sep">•</span>
+    TODOS LOS DERECHOS RESERVADOS
+  </div>
+</footer>
+
+{% endblock %}

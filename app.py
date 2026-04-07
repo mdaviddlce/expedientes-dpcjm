@@ -4,7 +4,7 @@ import os
 import re
 import sqlite3
 import zipfile
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from functools import wraps
 from io import BytesIO, StringIO
 from pathlib import Path
@@ -470,6 +470,7 @@ def build_expediente_pdf_bytes(expediente, checklist, checklist_state) -> bytes:
 def create_app() -> Flask:
     app = Flask(__name__, instance_relative_config=True)
     app.secret_key = os.environ.get("FLASK_SECRET_KEY", "CAMBIA-ESTO")
+    app.permanent_session_lifetime = timedelta(minutes=30)
 
     init_db(app)
     with app.app_context():
@@ -480,6 +481,17 @@ def create_app() -> Flask:
         db = g.pop("db", None)
         if db is not None:
             db.close()
+
+    @app.before_request
+    def check_session_timeout():
+        if session.get("user_id"):
+            last = session.get("_last_activity")
+            now_ts = datetime.now(timezone.utc).timestamp()
+            if last and (now_ts - last) > 1800:  # 30 minutos
+                session.clear()
+                flash("SESION EXPIRADA. INICIA SESION DE NUEVO.", "error")
+                return redirect(url_for("login_get"))
+            session["_last_activity"] = now_ts
 
     # -------------------------
     # AUTH
@@ -505,6 +517,7 @@ def create_app() -> Flask:
             flash("CREDENCIALES INVALIDAS.", "error")
             return redirect(url_for("login_get"))
 
+        session.permanent = True
         session["user_id"] = user["id"]
         session["username"] = user["username"]
         session["role"] = user["role"]
@@ -667,28 +680,81 @@ def create_app() -> Flask:
         return redirect(url_for("users_list"))
 
     # -------------------------
+    # AUDITORIA
+    # -------------------------
+    @app.get("/audit")
+    @login_required
+    @role_required(["ADMINISTRADOR"])
+    def audit_log_view():
+        page = max(1, int(request.args.get("page") or 1))
+        entity = (request.args.get("entity") or "").strip()
+        action = (request.args.get("action") or "").strip()
+        audit_page_size = 100
+
+        db = get_db()
+        where = "WHERE 1=1"
+        params: list = []
+
+        if entity:
+            where += " AND a.entity = ?"
+            params.append(entity)
+        if action:
+            where += " AND a.action = ?"
+            params.append(action)
+
+        total = db.execute(f"SELECT COUNT(*) AS c FROM audit_log a {where}", params).fetchone()["c"]
+        total_pages = max(1, (total + audit_page_size - 1) // audit_page_size)
+        page = min(page, total_pages)
+
+        rows = db.execute(
+            f"""
+            SELECT a.id, a.ts, a.action, a.entity, a.entity_id, a.field, a.old_value, a.new_value,
+                   u.username
+            FROM audit_log a
+            LEFT JOIN users u ON u.id = a.user_id
+            {where}
+            ORDER BY a.id DESC
+            LIMIT ? OFFSET ?
+            """,
+            params + [audit_page_size, (page - 1) * audit_page_size],
+        ).fetchall()
+
+        entities = db.execute("SELECT DISTINCT entity FROM audit_log ORDER BY entity").fetchall()
+        actions = db.execute("SELECT DISTINCT action FROM audit_log ORDER BY action").fetchall()
+
+        return render_template(
+            "audit_log.html",
+            rows=rows,
+            page=page,
+            total_pages=total_pages,
+            total=total,
+            entity=entity,
+            action=action,
+            entities=[r["entity"] for r in entities],
+            actions=[r["action"] for r in actions],
+        )
+
+    # -------------------------
     # INDEX
     # -------------------------
+    PAGE_SIZE = 50
+
     @app.get("/")
     @login_required
     def index():
         q = (request.args.get("q") or "").strip()
         year = (request.args.get("year") or "").strip()
         sort = (request.args.get("sort") or "desc").strip().lower()  # asc|desc
+        page = max(1, int(request.args.get("page") or 1))
 
         sort_dir = "ASC" if sort == "asc" else "DESC"
 
         db = get_db()
-        sql = """
-        SELECT id, expediente_code, inmueble_nombre, representante_legal, apoderados, domicilio_inspeccion,
-               telefono, quien_solicita, created_at, verificaciones, archivo_fisico
-        FROM expedientes
-        WHERE 1=1
-        """
-        params: list[str] = []
+        where = "WHERE 1=1"
+        params: list = []
 
         if q:
-            sql += """
+            where += """
               AND (
                 expediente_code LIKE ? OR inmueble_nombre LIKE ? OR representante_legal LIKE ?
                 OR apoderados LIKE ? OR domicilio_inspeccion LIKE ? OR telefono LIKE ?
@@ -699,18 +765,28 @@ def create_app() -> Flask:
 
         if year:
             yy = year[2:4]  # "26" si year es "2026"
-            sql += " AND substr(expediente_code, 8, 2) = ?"
+            where += " AND substr(expediente_code, 8, 2) = ?"
             params.append(yy)
 
-        sql += f"""
+        order = f"""
         ORDER BY
-          CAST(substr(expediente_code, 8, 2) AS INTEGER) {sort_dir},  -- YY
-          CAST(substr(expediente_code, 6, 2) AS INTEGER) {sort_dir},  -- MM
-          CAST(substr(expediente_code, 1, 4) AS INTEGER) {sort_dir},  -- NNNN
+          CAST(substr(expediente_code, 8, 2) AS INTEGER) {sort_dir},
+          CAST(substr(expediente_code, 6, 2) AS INTEGER) {sort_dir},
+          CAST(substr(expediente_code, 1, 4) AS INTEGER) {sort_dir},
           datetime(created_at) DESC
         """
 
-        rows = db.execute(sql, params).fetchall()
+        total = db.execute(f"SELECT COUNT(*) AS c FROM expedientes {where}", params).fetchone()["c"]
+        total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
+        page = min(page, total_pages)
+
+        sql = f"""
+        SELECT id, expediente_code, inmueble_nombre, representante_legal, apoderados, domicilio_inspeccion,
+               telefono, quien_solicita, created_at, verificaciones, archivo_fisico
+        FROM expedientes {where} {order}
+        LIMIT ? OFFSET ?
+        """
+        rows = db.execute(sql, params + [PAGE_SIZE, (page - 1) * PAGE_SIZE]).fetchall()
 
         years = db.execute(
             """
@@ -727,6 +803,10 @@ def create_app() -> Flask:
             q=q,
             year=year,
             years=[r["y"] for r in years if r["y"]],
+            page=page,
+            total_pages=total_pages,
+            total=total,
+            sort=sort,
         )
 
     # -------------------------

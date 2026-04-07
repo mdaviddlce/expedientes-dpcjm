@@ -31,6 +31,7 @@
         <!-- MODULO DE USUARIOS -->
         {% if session.get("role") == "ADMINISTRADOR" %}
         <a class="btn btn--ghost" href="{{ url_for('users_list') }}">USUARIOS</a>
+        <a class="btn btn--ghost" href="{{ url_for('audit_log_view') }}">BITÁCORA</a>
         {% endif %}
 
         <button class="btn btn--ghost" id="themeToggle" type="button" title="Cambiar tema">

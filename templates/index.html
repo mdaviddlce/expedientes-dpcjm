@@ -6,7 +6,7 @@
     <div>
       <h2>EXPEDIENTES</h2>
       <p class="muted">
-        LISTADO GENERAL · <span id="countLabel">{{ rows|length }}</span> REGISTRO(S)
+        LISTADO GENERAL · {{ total }} REGISTRO(S)
       </p>
     </div>
 
@@ -167,6 +167,26 @@
       </tbody>
     </table>
   </div>
+
+  {% if total_pages > 1 %}
+  <div class="pagination">
+    {% if page > 1 %}
+      <a class="btn btn--ghost btn--sm"
+         href="{{ url_for('index', q=q, year=year, sort=sort, page=page-1) }}">← ANT</a>
+    {% else %}
+      <span class="btn btn--ghost btn--sm disabled">← ANT</span>
+    {% endif %}
+
+    <span class="muted pagination__info">PÁG {{ page }} / {{ total_pages }}</span>
+
+    {% if page < total_pages %}
+      <a class="btn btn--ghost btn--sm"
+         href="{{ url_for('index', q=q, year=year, sort=sort, page=page+1) }}">SIG →</a>
+    {% else %}
+      <span class="btn btn--ghost btn--sm disabled">SIG →</span>
+    {% endif %}
+  </div>
+  {% endif %}
 </section>
 
 <!-- FOOTER -->
