@@ -102,8 +102,7 @@
 
           <div class="field">
             <label>INSPECCION</label>
-            <input type="text" name="inspeccion"
-                   placeholder="DESCRIPCION DE LA INSPECCION"
+            <input type="date" name="inspeccion"
                    value="{{ expediente['inspeccion'] or '' }}">
           </div>
 
@@ -191,7 +190,7 @@
 
           <div class="field">
             <label>INSPECCION</label>
-            <input type="text" value="{{ expediente['inspeccion'] or '' }}" disabled>
+            <input type="date" value="{{ expediente['inspeccion'] or '' }}" disabled>
           </div>
 
           <div class="field">

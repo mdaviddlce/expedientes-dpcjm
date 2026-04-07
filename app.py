@@ -966,13 +966,13 @@ def create_app() -> Flask:
             vobo_fecha = clean_date("vobo_fecha")
             pipc_fecha = clean_date("pipc_fecha")
             fecha_limite = clean_date("fecha_limite")
+            inspeccion = clean_date("inspeccion")
         except ValueError as e:
             flash(str(e), "error")
             return redirect(url_for("expediente_view", expediente_id=expediente_id))
 
         acta_inspeccion_folio = (f.get("acta_inspeccion_folio") or "").strip().upper()
         observaciones = (f.get("observaciones") or "").strip()
-        inspeccion = (f.get("inspeccion") or "").strip().upper()
 
         now = utc_now()
         user_id = current_user_id()
@@ -1007,7 +1007,7 @@ def create_app() -> Flask:
                 vobo_fecha,
                 pipc_fecha,
                 observaciones,
-                inspeccion or None,
+                inspeccion,
                 fecha_limite,
                 now,
                 user_id,
