@@ -829,6 +829,38 @@ html[data-theme="light"] .actions-menu__danger:hover{
   color: var(--muted);
 }
 
+/* =========================
+   AUDITORIA
+   ========================= */
+.audit-val{
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: .82rem;
+  color: var(--muted);
+}
+
+/* =========================
+   PAGINACION
+   ========================= */
+.pagination{
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: .75rem;
+  padding: 1rem 1.5rem;
+  border-top: 1px solid var(--border);
+}
+.pagination__info{
+  font-size: .78rem;
+  letter-spacing: .08em;
+}
+.btn.disabled{
+  opacity: .3;
+  pointer-events: none;
+}
+
 .footer .sep{
   margin: 0 .5rem;
   opacity: .6;
