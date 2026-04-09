@@ -73,7 +73,6 @@
           <tr>
             <th>CONTENIDO DEL EXPEDIENTE</th>
             <th class="center">PRESENTA</th>
-            <th class="center">NO PRESENTA</th>
           </tr>
         </thead>
         <tbody>
@@ -82,20 +81,13 @@
             <tr>
               <td>{{ item["label"] }}</td>
               <td class="center">
-                <input class="radio-toggle" type="radio" name="item_{{ item['id'] }}" value="presenta"
+                <input type="checkbox" name="item_{{ item['id'] }}" value="presenta"
                        {% if st=="presenta" %}checked{% endif %}>
-              </td>
-              <td class="center">
-                <input class="radio-toggle" type="radio" name="item_{{ item['id'] }}" value="no_presenta"
-                       {% if st=="no_presenta" %}checked{% endif %}>
               </td>
             </tr>
           {% endfor %}
         </tbody>
       </table>
-      <p class="muted small" style="margin-top:8px;">
-        TIP: PARA QUITAR UNA SELECCION, HAZ CLIC DE NUEVO SOBRE EL MISMO RADIO.
-      </p>
     </div>
 
     <div class="actions">

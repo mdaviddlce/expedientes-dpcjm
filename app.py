@@ -70,7 +70,6 @@ CHECKLIST_DEFAULT = [
     "CONSTANCIA DE SITUACION FISCAL",
     "PAGO REALIZADO VO. BO.",
     "PAGO REALIZADO DE PROGRAMA O PLAN",
-    "TRANSPARENCIA",
 ]
 
 PRIVACY_NOTICE = (
@@ -293,6 +292,9 @@ def init_db(app: Flask) -> None:
         add_column(cur, "expedientes", "inspeccion TEXT")
         add_column(cur, "expedientes", "fecha_limite TEXT")
 
+        # Eliminar TRANSPARENCIA del checklist (se mantiene solo en archivo_fisico)
+        cur.execute("DELETE FROM checklist_items WHERE label = 'TRANSPARENCIA'")
+
         db.commit()
 
         now = utc_now()
@@ -439,8 +441,7 @@ def build_expediente_pdf_bytes(expediente, checklist, checklist_state) -> bytes:
 
     c.setFont("Helvetica-Bold", 9)
     c.drawString(x, y, "CONTENIDO DEL EXPEDIENTE")
-    c.drawString(width - 6.0 * cm, y, "PRESENTA")
-    c.drawString(width - 3.2 * cm, y, "NO PRESENTA")
+    c.drawString(width - 4.0 * cm, y, "PRESENTA")
     y -= 0.45 * cm
     c.line(x, y, width - x, y)
     y -= 0.35 * cm
@@ -455,8 +456,7 @@ def build_expediente_pdf_bytes(expediente, checklist, checklist_state) -> bytes:
             y = height - 2 * cm
 
         c.drawString(x, y, label[:95])
-        c.drawString(width - 5.2 * cm, y, "X" if st == "presenta" else "")
-        c.drawString(width - 2.4 * cm, y, "X" if st == "no_presenta" else "")
+        c.drawString(width - 3.0 * cm, y, "X" if st == "presenta" else "")
         y -= 0.45 * cm
 
     y -= 0.5 * cm
@@ -907,7 +907,7 @@ def create_app() -> Flask:
         for item in load_checklist_items():
             key = f"item_{item['id']}"
             status = (form.get(key) or "").strip()
-            status_db = status if status in ("presenta", "no_presenta") else None
+            status_db = "presenta" if status == "presenta" else None
             db.execute(
                 "INSERT INTO expediente_checklist (expediente_id, item_id, status) VALUES (?, ?, ?)",
                 (expediente_id, item["id"], status_db),
@@ -1148,7 +1148,7 @@ def create_app() -> Flask:
         for item in load_checklist_items():
             key = f"item_{item['id']}"
             status = (form.get(key) or "").strip()
-            status_db = status if status in ("presenta", "no_presenta") else None
+            status_db = "presenta" if status == "presenta" else None
 
             old_row = db.execute(
                 "SELECT status FROM expediente_checklist WHERE expediente_id=? AND item_id=?",
@@ -1318,6 +1318,8 @@ def create_app() -> Flask:
               quien_solicita,
               citatorio_fecha,
               acta_inspeccion_folio,
+              inspeccion,
+              fecha_limite,
               acta_verificacion_fecha,
               resolutivo_fecha,
               ultimo_aviso_fecha,
@@ -1333,20 +1335,38 @@ def create_app() -> Flask:
             ids,
         ).fetchall()
 
+        def dias_restantes_csv(r):
+            if r["vobo_fecha"] or r["pipc_fecha"]:
+                return "CUMPLIDO"
+            fl = r["fecha_limite"]
+            if not fl:
+                return ""
+            try:
+                from datetime import date as _date
+                diff = (_date.fromisoformat(fl) - _date.today()).days
+                if diff < 0:
+                    return "VENCIDO"
+                return str(diff)
+            except Exception:
+                return ""
+
         sio = StringIO()
         w = csv.writer(sio)
 
         w.writerow(
             [
-                "NUMERO DE EXPEDIENTE",
+                "NO. EXPEDIENTE",
                 "NOMBRE DEL INMUEBLE",
                 "REPRESENTANTE LEGAL",
-                "APODERADOS",
+                "APODERADO",
                 "DOMICILIO DE LA INSPECCION",
                 "TELEFONO",
                 "QUIEN SOLICITA",
                 "CITATORIO",
                 "NO. ACTA INSPECCION",
+                "INSPECCION",
+                "LIMITE",
+                "DIAS RESTANTES",
                 "ACTA VERIFICACION",
                 "RESOLUTIVO",
                 "ULTIMO AVISO",
@@ -1370,6 +1390,9 @@ def create_app() -> Flask:
                     r["quien_solicita"] or "",
                     r["citatorio_fecha"] or "",
                     r["acta_inspeccion_folio"] or "",
+                    r["inspeccion"] or "",
+                    r["fecha_limite"] or "",
+                    dias_restantes_csv(r),
                     r["acta_verificacion_fecha"] or "",
                     r["resolutivo_fecha"] or "",
                     r["ultimo_aviso_fecha"] or "",

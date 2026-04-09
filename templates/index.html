@@ -10,7 +10,7 @@
       </p>
     </div>
 
-    <div class="row">
+    <div class="row" style="gap:8px;align-items:center;">
       <form id="bulkForm" method="post" class="inline icon-actions">
         <button class="btn btn--icon"
                 type="submit"
@@ -18,7 +18,6 @@
                 title="Descargar PDFs seleccionados">
           📄
         </button>
-
         <button class="btn btn--icon"
                 type="submit"
                 formaction="{{ url_for('expedientes_lista') }}"
@@ -26,6 +25,9 @@
           📋
         </button>
       </form>
+
+      <span id="selCount" class="badge badge--ok" style="display:none" title="Expedientes seleccionados"></span>
+      <button id="clearSel" type="button" class="btn btn--ghost btn--sm" style="display:none" title="Limpiar selección">✕ LIMPIAR</button>
 
       {% if session.get("role") in ["CAPTURA","ADMINISTRADOR"] %}
         <a class="btn btn--icon"
@@ -219,40 +221,121 @@
 
 <script>
 (function() {
+  // ── DÍAS RESTANTES ──────────────────────────────────────────────
   function calcDias() {
     document.querySelectorAll(".dias-restantes").forEach(function(el) {
       var vobo  = el.dataset.vobo;
       var pipc  = el.dataset.pipc;
       var fecha = el.dataset.fecha;
-
-      if (vobo || pipc) {
-        el.className = "dias-restantes dias--verde";
-        el.textContent = "✅";
-        return;
-      }
-
+      if (vobo || pipc) { el.className = "dias-restantes dias--verde"; el.textContent = "✅"; return; }
       if (!fecha) { el.textContent = "—"; el.className = "dias-restantes"; return; }
+      var hoy = new Date(); hoy.setHours(0,0,0,0);
+      var diff = Math.round((new Date(fecha + "T00:00:00") - hoy) / 86400000);
+      if (diff < 0)       { el.className = "dias-restantes dias--vencido";  el.textContent = "VENCIDO"; }
+      else if (diff <= 3) { el.className = "dias-restantes dias--rojo";     el.textContent = diff === 0 ? "HOY" : diff + (diff===1?" DÍA":" DÍAS"); }
+      else if (diff <= 8) { el.className = "dias-restantes dias--amarillo"; el.textContent = diff + " DÍAS"; }
+      else                { el.className = "dias-restantes dias--verde";    el.textContent = diff + " DÍAS"; }
+    });
+  }
 
-      var hoy   = new Date(); hoy.setHours(0,0,0,0);
-      var limite = new Date(fecha + "T00:00:00");
-      var diff  = Math.round((limite - hoy) / 86400000);
+  // ── SELECCIÓN PERSISTENTE ────────────────────────────────────────
+  var STORE_KEY = "expSelIds";
 
-      if (diff < 0) {
-        el.className = "dias-restantes dias--vencido";
-        el.textContent = "VENCIDO";
-      } else if (diff <= 3) {
-        el.className = "dias-restantes dias--rojo";
-        el.textContent = diff === 0 ? "HOY" : diff + (diff === 1 ? " DÍA" : " DÍAS");
-      } else if (diff <= 8) {
-        el.className = "dias-restantes dias--amarillo";
-        el.textContent = diff + " DÍAS";
-      } else {
-        el.className = "dias-restantes dias--verde";
-        el.textContent = diff + " DÍAS";
+  function loadIds()       { try { return new Set(JSON.parse(sessionStorage.getItem(STORE_KEY) || "[]")); } catch(e){ return new Set(); } }
+  function saveIds(s)      { sessionStorage.setItem(STORE_KEY, JSON.stringify(Array.from(s))); }
+  function clearIds()      { sessionStorage.removeItem(STORE_KEY); }
+
+  function updateUI(selected) {
+    var count   = selected.size;
+    var countEl = document.getElementById("selCount");
+    var clearEl = document.getElementById("clearSel");
+    if (countEl) { countEl.textContent = count + " SEL."; countEl.style.display = count ? "" : "none"; }
+    if (clearEl) { clearEl.style.display = count ? "" : "none"; }
+  }
+
+  function syncCheckboxes(selected) {
+    document.querySelectorAll('input[name="expediente_ids"]').forEach(function(cb) {
+      cb.checked = selected.has(cb.value);
+    });
+    var selectAll = document.getElementById("selectAll");
+    if (selectAll) {
+      var all = document.querySelectorAll('input[name="expediente_ids"]');
+      selectAll.checked = all.length > 0 && Array.from(all).every(function(cb){ return cb.checked; });
+      selectAll.indeterminate = !selectAll.checked && Array.from(all).some(function(cb){ return cb.checked; });
+    }
+  }
+
+  // Inject hidden inputs para IDs de otras páginas al enviar el form
+  function injectHiddenIds(form, selected) {
+    // quitar los que ya estén en inputs visibles
+    var visible = new Set();
+    form.querySelectorAll('input[name="expediente_ids"]').forEach(function(cb){ if (cb.checked) visible.add(cb.value); });
+    // quitar inyecciones previas
+    form.querySelectorAll('input[data-injected="1"]').forEach(function(h){ h.remove(); });
+    selected.forEach(function(id) {
+      if (!visible.has(id)) {
+        var h = document.createElement("input");
+        h.type = "hidden"; h.name = "expediente_ids"; h.value = id; h.dataset.injected = "1";
+        form.appendChild(h);
       }
     });
   }
-  document.addEventListener("DOMContentLoaded", calcDias);
+
+  document.addEventListener("DOMContentLoaded", function() {
+    calcDias();
+
+    var selected = loadIds();
+    syncCheckboxes(selected);
+    updateUI(selected);
+
+    // Cambio individual de checkbox
+    document.addEventListener("change", function(e) {
+      if (!e.target.matches('input[name="expediente_ids"]')) return;
+      selected = loadIds();
+      if (e.target.checked) selected.add(e.target.value);
+      else selected.delete(e.target.value);
+      saveIds(selected);
+      updateUI(selected);
+      syncCheckboxes(selected);
+    });
+
+    // Select all (solo página actual)
+    var selectAll = document.getElementById("selectAll");
+    if (selectAll) {
+      selectAll.addEventListener("change", function() {
+        selected = loadIds();
+        document.querySelectorAll('input[name="expediente_ids"]').forEach(function(cb) {
+          cb.checked = selectAll.checked;
+          if (selectAll.checked) selected.add(cb.value);
+          else selected.delete(cb.value);
+        });
+        saveIds(selected);
+        updateUI(selected);
+      });
+    }
+
+    // Limpiar selección
+    var clearEl = document.getElementById("clearSel");
+    if (clearEl) {
+      clearEl.addEventListener("click", function() {
+        clearIds();
+        selected = new Set();
+        syncCheckboxes(selected);
+        updateUI(selected);
+      });
+    }
+
+    // Al enviar el bulkForm: inyectar IDs de otras páginas
+    var bulkForm = document.getElementById("bulkForm");
+    if (bulkForm) {
+      bulkForm.addEventListener("submit", function() {
+        selected = loadIds();
+        injectHiddenIds(bulkForm, selected);
+        // Limpiar selección después de descargar
+        setTimeout(function(){ clearIds(); }, 1500);
+      });
+    }
+  });
 })();
 </script>
 

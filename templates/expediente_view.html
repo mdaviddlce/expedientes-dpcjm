@@ -55,7 +55,6 @@
           <tr>
             <th>CONTENIDO DEL EXPEDIENTE</th>
             <th class="center">PRESENTA</th>
-            <th class="center">NO PRESENTA</th>
           </tr>
         </thead>
         <tbody>
@@ -64,7 +63,6 @@
             <tr>
               <td>{{ item["label"] }}</td>
               <td class="center">{{ "✓" if st=="presenta" else "" }}</td>
-              <td class="center">{{ "✓" if st=="no_presenta" else "" }}</td>
             </tr>
           {% endfor %}
         </tbody>
