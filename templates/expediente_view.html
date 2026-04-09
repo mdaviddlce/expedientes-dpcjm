@@ -254,49 +254,48 @@
 
 <script>
 function calcDiasRestantes() {
+  var vobo = "{{ expediente['vobo_fecha'] or '' }}";
+  var pipc = "{{ expediente['pipc_fecha'] or '' }}";
+
   document.querySelectorAll(".dias-restantes").forEach(function(el) {
+    // Si ya tiene VO BO o PIPC → cumplido ✅
+    if (vobo || pipc) {
+      el.className = "dias-restantes dias--verde";
+      el.textContent = "✅ CUMPLIDO";
+      return;
+    }
+
     var fecha = el.dataset.fecha;
     if (!fecha) { el.textContent = "—"; el.className = "dias-restantes"; return; }
 
-    var hoy = new Date();
-    hoy.setHours(0, 0, 0, 0);
+    var hoy = new Date(); hoy.setHours(0,0,0,0);
     var limite = new Date(fecha + "T00:00:00");
     var diff = Math.round((limite - hoy) / 86400000);
 
-    var clase = "dias-restantes ";
-    var texto = "";
-
     if (diff < 0) {
-      clase += "dias--vencido";
-      texto = "VENCIDO";
+      el.className = "dias-restantes dias--vencido";
+      el.textContent = "VENCIDO";
     } else if (diff <= 3) {
-      clase += "dias--rojo";
-      texto = diff === 0 ? "HOY" : diff + (diff === 1 ? " DÍA" : " DÍAS");
+      el.className = "dias-restantes dias--rojo";
+      el.textContent = diff === 0 ? "HOY" : diff + (diff === 1 ? " DÍA" : " DÍAS");
     } else if (diff <= 8) {
-      clase += "dias--amarillo";
-      texto = diff + " DÍAS";
+      el.className = "dias-restantes dias--amarillo";
+      el.textContent = diff + " DÍAS";
     } else {
-      clase += "dias--verde";
-      texto = diff + " DÍAS";
+      el.className = "dias-restantes dias--verde";
+      el.textContent = diff + " DÍAS";
     }
-
-    el.className = clase;
-    el.textContent = texto;
   });
 }
 
-// Actualiza al cargar
 calcDiasRestantes();
 
-// Si hay un input de fecha_limite, actualiza en tiempo real al cambiar
+// Actualiza en tiempo real al cambiar fecha_limite
 var input = document.getElementById("fecha_limite_input");
 if (input) {
   input.addEventListener("change", function() {
     var display = document.getElementById("dias_restantes_display");
-    if (display) {
-      display.dataset.fecha = this.value;
-      calcDiasRestantes();
-    }
+    if (display) { display.dataset.fecha = this.value; calcDiasRestantes(); }
   });
 }
 </script>

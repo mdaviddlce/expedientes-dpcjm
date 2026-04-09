@@ -794,7 +794,9 @@ def create_app() -> Flask:
 
         sql = f"""
         SELECT id, expediente_code, inmueble_nombre, representante_legal, apoderados, domicilio_inspeccion,
-               telefono, quien_solicita, created_at, verificaciones, archivo_fisico
+               telefono, quien_solicita, created_at, verificaciones, archivo_fisico,
+               ultimo_aviso_fecha, segundo_aviso_fecha, clausura_fecha,
+               fecha_limite, vobo_fecha, pipc_fecha
         FROM expedientes {where} {order}
         LIMIT ? OFFSET ?
         """

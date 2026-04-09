@@ -99,6 +99,7 @@
           <th>APODERADOS</th>
           <th>ARCHIVO FISICO</th>
           <th class="center">AVISOS</th>
+          <th class="center">DÍAS RESTANTES</th>
           <th class="right">ACCIONES</th>
         </tr>
       </thead>
@@ -144,13 +145,28 @@
             <td>{{ r["archivo_fisico"] or "—" }}</td>
 
             <td class="center">
-              <div class="avisos-control" data-id="{{ r['id'] }}">
-                <span class="badge badge--{{ sev }} aviso-badge">{{ v }}</span>
-
-                {% if session.get("role") in ["CAPTURA","ADMINISTRADOR"] %}
-                  <button type="button" class="btn btn--chip btn-avisos" data-action="dec" title="Disminuir">−</button>
-                  <button type="button" class="btn btn--chip btn-avisos" data-action="inc" title="Aumentar">+</button>
+              <div class="avisos-badges">
+                {% if r["ultimo_aviso_fecha"] %}
+                  <span class="badge badge--ok aviso-num" title="Último aviso: {{ r['ultimo_aviso_fecha'] }}">1</span>
                 {% endif %}
+                {% if r["segundo_aviso_fecha"] %}
+                  <span class="badge badge--warn aviso-num" title="Segundo aviso: {{ r['segundo_aviso_fecha'] }}">2</span>
+                {% endif %}
+                {% if r["clausura_fecha"] %}
+                  <span class="badge badge--bad aviso-num" title="Clausura: {{ r['clausura_fecha'] }}">3</span>
+                {% endif %}
+                {% if not r["ultimo_aviso_fecha"] and not r["segundo_aviso_fecha"] and not r["clausura_fecha"] %}
+                  <span class="muted">—</span>
+                {% endif %}
+              </div>
+            </td>
+
+            <td class="center">
+              <div class="dias-restantes"
+                   data-fecha="{{ r['fecha_limite'] or '' }}"
+                   data-vobo="{{ r['vobo_fecha'] or '' }}"
+                   data-pipc="{{ r['pipc_fecha'] or '' }}">
+                —
               </div>
             </td>
 
@@ -163,7 +179,7 @@
         {% endfor %}
 
         {% if rows|length == 0 %}
-          <tr><td colspan="8" class="muted center">SIN REGISTROS.</td></tr>
+          <tr><td colspan="9" class="muted center">SIN REGISTROS.</td></tr>
         {% endif %}
       </tbody>
     </table>
@@ -199,5 +215,45 @@
       TODOS LOS DERECHOS RESERVADOS
     </div>
   </footer>
+
+
+<script>
+(function() {
+  function calcDias() {
+    document.querySelectorAll(".dias-restantes").forEach(function(el) {
+      var vobo  = el.dataset.vobo;
+      var pipc  = el.dataset.pipc;
+      var fecha = el.dataset.fecha;
+
+      if (vobo || pipc) {
+        el.className = "dias-restantes dias--verde";
+        el.textContent = "✅";
+        return;
+      }
+
+      if (!fecha) { el.textContent = "—"; el.className = "dias-restantes"; return; }
+
+      var hoy   = new Date(); hoy.setHours(0,0,0,0);
+      var limite = new Date(fecha + "T00:00:00");
+      var diff  = Math.round((limite - hoy) / 86400000);
+
+      if (diff < 0) {
+        el.className = "dias-restantes dias--vencido";
+        el.textContent = "VENCIDO";
+      } else if (diff <= 3) {
+        el.className = "dias-restantes dias--rojo";
+        el.textContent = diff === 0 ? "HOY" : diff + (diff === 1 ? " DÍA" : " DÍAS");
+      } else if (diff <= 8) {
+        el.className = "dias-restantes dias--amarillo";
+        el.textContent = diff + " DÍAS";
+      } else {
+        el.className = "dias-restantes dias--verde";
+        el.textContent = diff + " DÍAS";
+      }
+    });
+  }
+  document.addEventListener("DOMContentLoaded", calcDias);
+})();
+</script>
 
 {% endblock %}

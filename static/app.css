@@ -917,6 +917,23 @@ textarea{
 }
 
 /* =========================
+   AVISOS AUTO (badges)
+   ========================= */
+.avisos-badges{
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+.aviso-num{
+  min-width: 28px;
+  height: 28px;
+  font-size: .8rem;
+  font-weight: 900;
+  margin-right: 0;
+}
+
+/* =========================
    DIAS RESTANTES
    ========================= */
 .dias-restantes{
