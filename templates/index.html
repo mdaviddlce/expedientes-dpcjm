@@ -299,18 +299,41 @@
       syncCheckboxes(selected);
     });
 
-    // Select all (solo página actual)
+    // Guardar URL actual al abrir un expediente (para que VOLVER recuerde los filtros)
+    document.querySelectorAll('a.btn--sm[href*="/expedientes/"]').forEach(function(a) {
+      a.addEventListener("click", function() {
+        sessionStorage.setItem('lastIndexUrl', window.location.href);
+      });
+    });
+
+    // Select all — selecciona TODOS los registros del filtro actual (no solo la página)
     var selectAll = document.getElementById("selectAll");
     if (selectAll) {
       selectAll.addEventListener("change", function() {
-        selected = loadIds();
-        document.querySelectorAll('input[name="expediente_ids"]').forEach(function(cb) {
-          cb.checked = selectAll.checked;
-          if (selectAll.checked) selected.add(cb.value);
-          else selected.delete(cb.value);
-        });
-        saveIds(selected);
-        updateUI(selected);
+        if (!selectAll.checked) {
+          // Deseleccionar todo
+          selected = new Set();
+          saveIds(selected);
+          syncCheckboxes(selected);
+          updateUI(selected);
+          return;
+        }
+        // Obtener todos los IDs del filtro actual vía AJAX
+        var params = new URLSearchParams(window.location.search);
+        var q    = params.get('q')    || '';
+        var year = params.get('year') || '';
+        var url  = '/expedientes/ids.json?q=' + encodeURIComponent(q) + '&year=' + encodeURIComponent(year);
+        selectAll.disabled = true;
+        fetch(url)
+          .then(function(r){ return r.json(); })
+          .then(function(ids) {
+            selected = new Set(ids);
+            saveIds(selected);
+            syncCheckboxes(selected);
+            updateUI(selected);
+          })
+          .catch(function(){ console.error('No se pudieron obtener los IDs'); })
+          .finally(function(){ selectAll.disabled = false; });
       });
     }
 

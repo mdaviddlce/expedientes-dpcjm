@@ -830,6 +830,29 @@ def create_app() -> Flask:
     # -------------------------
     PAGE_SIZE = 50
 
+    @app.get("/expedientes/ids.json")
+    @login_required
+    def expedientes_ids():
+        """Devuelve todos los IDs que coinciden con el filtro actual (para seleccionar todo)."""
+        from flask import jsonify
+        q    = (request.args.get("q") or "").strip()
+        year = (request.args.get("year") or "").strip()
+        db   = get_db()
+        where  = "WHERE 1=1"
+        params: list = []
+        if q:
+            where += """ AND (
+                expediente_code LIKE ? OR inmueble_nombre LIKE ? OR representante_legal LIKE ?
+                OR apoderados LIKE ? OR domicilio_inspeccion LIKE ? OR telefono LIKE ?
+            )"""
+            like = f"%{q}%"
+            params += [like, like, like, like, like, like]
+        if year:
+            where += " AND substr(expediente_code, 8, 2) = ?"
+            params.append(year[2:4])
+        rows = db.execute(f"SELECT id FROM expedientes {where}", params).fetchall()
+        return jsonify([str(r["id"]) for r in rows])
+
     @app.get("/")
     @login_required
     def index():

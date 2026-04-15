@@ -9,7 +9,13 @@
     </div>
 
     <div class="row" style="justify-content:flex-end; gap:10px; margin-bottom:12px;">
-      <a class="btn btn--ghost" href="{{ url_for('index') }}">← VOLVER</a>
+      <a class="btn btn--ghost" id="btnVolver" href="{{ url_for('index') }}">← VOLVER</a>
+      <script>
+        (function(){
+          var saved = sessionStorage.getItem('lastIndexUrl');
+          if (saved) document.getElementById('btnVolver').href = saved;
+        })();
+      </script>
 
       <a class="btn btn--ghost" href="{{ url_for('expediente_pdf', expediente_id=expediente['id']) }}">
         PDF
