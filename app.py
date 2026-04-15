@@ -413,27 +413,62 @@ def build_expediente_pdf_bytes(expediente, checklist, checklist_state) -> bytes:
 
     # ── TABLA DE DATOS ─────────────────────────────────────────────
     LABEL_W  = 5.8 * cm
-    ROW_H    = 1.05 * cm
+    BASE_ROW = 1.05 * cm   # altura mínima de fila
+    LINE_H   = 0.42 * cm   # alto de cada línea extra
+    PAD_V    = 0.28 * cm   # padding vertical interior
     LBL_FS   = 9
     VAL_FS   = 9.5
     c.setLineWidth(0.6)
     c.setStrokeColorRGB(0.2, 0.2, 0.2)
 
+    def wrap_text(text, font, fs, max_w):
+        """Parte el texto en líneas que quepan en max_w."""
+        words = (text or "").split()
+        lines, cur = [], []
+        for word in words:
+            if c.stringWidth(" ".join(cur + [word]), font, fs) <= max_w:
+                cur.append(word)
+            else:
+                if cur:
+                    lines.append(" ".join(cur))
+                cur = [word]
+        if cur:
+            lines.append(" ".join(cur))
+        return lines or [""]
+
+    def row_height(label_bot, val_lines):
+        """Calcula la altura necesaria para una fila."""
+        lbl_lines = 2 if label_bot else 1
+        n = max(lbl_lines, len(val_lines))
+        return max(BASE_ROW, PAD_V * 2 + n * LINE_H)
+
     def draw_row(label_top, label_bot, value, y_pos):
-        c.rect(ML, y_pos - ROW_H, CW, ROW_H, fill=0, stroke=1)
-        c.line(ML + LABEL_W, y_pos - ROW_H, ML + LABEL_W, y_pos)
+        max_w = CW - LABEL_W - 0.5 * cm
+        val_lines = wrap_text(str(value) if value else "", "Helvetica", VAL_FS, max_w)
+        rh = row_height(label_bot, val_lines)
+
+        c.rect(ML, y_pos - rh, CW, rh, fill=0, stroke=1)
+        c.line(ML + LABEL_W, y_pos - rh, ML + LABEL_W, y_pos)
+
+        # Etiqueta
         c.setFont("Helvetica-Bold", LBL_FS)
         if label_bot:
-            c.drawString(ML + 0.25 * cm, y_pos - 0.32 * cm, label_top)
-            c.drawString(ML + 0.25 * cm, y_pos - 0.68 * cm, label_bot)
+            c.drawString(ML + 0.25 * cm, y_pos - PAD_V - LINE_H * 0.85, label_top)
+            c.drawString(ML + 0.25 * cm, y_pos - PAD_V - LINE_H * 1.85, label_bot)
         else:
-            c.drawString(ML + 0.25 * cm, y_pos - ROW_H * 0.58, label_top)
+            c.drawString(ML + 0.25 * cm, y_pos - rh / 2 + LINE_H * 0.3, label_top)
+
+        # Valor (multi-línea)
         c.setFont("Helvetica", VAL_FS)
-        val = str(value) if value else ""
-        max_w = CW - LABEL_W - 0.5 * cm
-        while val and c.stringWidth(val, "Helvetica", VAL_FS) > max_w:
-            val = val[:-1]
-        c.drawString(ML + LABEL_W + 0.25 * cm, y_pos - ROW_H * 0.58, val)
+        vx = ML + LABEL_W + 0.25 * cm
+        # Centrar verticalmente el bloque de texto
+        block_h = len(val_lines) * LINE_H
+        vy = y_pos - (rh - block_h) / 2 - LINE_H * 0.75
+        for line in val_lines:
+            c.drawString(vx, vy, line)
+            vy -= LINE_H
+
+        return rh  # devuelve la altura usada
 
     rows = [
         ("NUMERO DE EXPEDIENTE:",  None,               expediente["expediente_code"] or ""),
@@ -445,8 +480,7 @@ def build_expediente_pdf_bytes(expediente, checklist, checklist_state) -> bytes:
         ("QUIEN SOLICITA:",        None,                expediente["quien_solicita"] or ""),
     ]
     for l1, l2, val in rows:
-        draw_row(l1, l2, val, y)
-        y -= ROW_H
+        y -= draw_row(l1, l2, val, y)
 
     y -= 0.35 * cm
 
