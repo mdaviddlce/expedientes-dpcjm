@@ -388,126 +388,115 @@ def build_expediente_pdf_bytes(expediente, checklist, checklist_state) -> bytes:
     c = canvas.Canvas(content_buf, pagesize=LETTER)
     width, height = LETTER
 
-    ML = 1.8 * cm   # margen izquierdo
-    MR = 1.8 * cm   # margen derecho
-    CW = width - ML - MR  # ancho del área de contenido
+    ML = 1.8 * cm          # margen izquierdo
+    CW = width - ML * 2    # ancho del área de contenido
 
     year = (expediente["created_at"] or "")[:4] or "AAAA"
 
-    # Inicio debajo del área del membrete (logos ~2.7 cm)
+    # Inicio justo debajo de los logos del membrete
     y = height - 3.5 * cm
 
     # ── CAJA DE TÍTULO (gris) ──────────────────────────────────────
-    TITLE_H = 2.1 * cm
-    c.setLineWidth(0.6)
-    c.setFillColorRGB(0.82, 0.82, 0.82)
+    TITLE_H = 2.5 * cm
+    c.setLineWidth(0.7)
+    c.setFillColorRGB(0.80, 0.80, 0.80)
     c.rect(ML, y - TITLE_H, CW, TITLE_H, fill=1, stroke=1)
     c.setFillColorRGB(0, 0, 0)
-    c.setFont("Helvetica-Bold", 10)
-    c.drawCentredString(width / 2, y - 0.58 * cm,
+    c.setFont("Helvetica-Bold", 12)
+    c.drawCentredString(width / 2, y - 0.65 * cm,
                         "DEPARTAMENTO DE PROTECCION CIVIL DE JESUS MARIA, AGUASCALIENTES.")
-    c.setFont("Helvetica-Bold", 8.5)
-    c.drawCentredString(width / 2, y - 1.12 * cm, f"EXPEDIENTE AÑO {year}")
-    c.drawCentredString(width / 2, y - 1.62 * cm, "DATOS DE LA INSPECCION")
+    c.setFont("Helvetica-Bold", 10)
+    c.drawCentredString(width / 2, y - 1.25 * cm, f"EXPEDIENTE AÑO {year}")
+    c.setFont("Helvetica-Bold", 10)
+    c.drawCentredString(width / 2, y - 1.88 * cm, "DATOS DE LA INSPECCION")
     y -= TITLE_H
 
     # ── TABLA DE DATOS ─────────────────────────────────────────────
-    LABEL_W = 5.0 * cm
-    ROW_H   = 0.88 * cm
-    c.setLineWidth(0.5)
-    c.setStrokeColorRGB(0.25, 0.25, 0.25)
+    LABEL_W  = 5.8 * cm
+    ROW_H    = 1.05 * cm
+    LBL_FS   = 9
+    VAL_FS   = 9.5
+    c.setLineWidth(0.6)
+    c.setStrokeColorRGB(0.2, 0.2, 0.2)
 
     def draw_row(label_top, label_bot, value, y_pos):
         c.rect(ML, y_pos - ROW_H, CW, ROW_H, fill=0, stroke=1)
         c.line(ML + LABEL_W, y_pos - ROW_H, ML + LABEL_W, y_pos)
-        c.setFont("Helvetica-Bold", 7.5)
+        c.setFont("Helvetica-Bold", LBL_FS)
         if label_bot:
-            c.drawString(ML + 0.2 * cm, y_pos - 0.27 * cm, label_top)
-            c.drawString(ML + 0.2 * cm, y_pos - 0.58 * cm, label_bot)
+            c.drawString(ML + 0.25 * cm, y_pos - 0.32 * cm, label_top)
+            c.drawString(ML + 0.25 * cm, y_pos - 0.68 * cm, label_bot)
         else:
-            c.drawString(ML + 0.2 * cm, y_pos - ROW_H * 0.58, label_top)
-        c.setFont("Helvetica", 8)
+            c.drawString(ML + 0.25 * cm, y_pos - ROW_H * 0.58, label_top)
+        c.setFont("Helvetica", VAL_FS)
         val = str(value) if value else ""
-        max_w = CW - LABEL_W - 0.4 * cm
-        while val and c.stringWidth(val, "Helvetica", 8) > max_w:
+        max_w = CW - LABEL_W - 0.5 * cm
+        while val and c.stringWidth(val, "Helvetica", VAL_FS) > max_w:
             val = val[:-1]
-        c.drawString(ML + LABEL_W + 0.2 * cm, y_pos - ROW_H * 0.58, val)
+        c.drawString(ML + LABEL_W + 0.25 * cm, y_pos - ROW_H * 0.58, val)
 
     rows = [
-        ("NUMERO DE EXPEDIENTE:", None,               expediente["expediente_code"] or ""),
-        ("NOMBRE DEL INMUEBLE:", None,                expediente["inmueble_nombre"] or ""),
-        ("REPRESENTANTE LEGAL", "Y/O PROPIETARIO:",   expediente["representante_legal"] or ""),
-        ("APODERADO:", None,                          expediente["apoderados"] or ""),
-        ("DOMICILIO DEL INMUEBLE:", None,             expediente["domicilio_inspeccion"] or ""),
-        ("TELEFONO:", None,                           expediente["telefono"] or ""),
-        ("QUIEN SOLICITA:", None,                     expediente["quien_solicita"] or ""),
+        ("NUMERO DE EXPEDIENTE:",  None,               expediente["expediente_code"] or ""),
+        ("NOMBRE DEL INMUEBLE:",   None,                expediente["inmueble_nombre"] or ""),
+        ("REPRESENTANTE LEGAL",    "Y/O PROPIETARIO:",  expediente["representante_legal"] or ""),
+        ("APODERADO:",             None,                expediente["apoderados"] or ""),
+        ("DOMICILIO DEL INMUEBLE:", None,               expediente["domicilio_inspeccion"] or ""),
+        ("TELEFONO:",              None,                expediente["telefono"] or ""),
+        ("QUIEN SOLICITA:",        None,                expediente["quien_solicita"] or ""),
     ]
     for l1, l2, val in rows:
         draw_row(l1, l2, val, y)
         y -= ROW_H
 
-    y -= 0.25 * cm
+    y -= 0.35 * cm
 
     # ── CHECKLIST (izq) + AVISO DE PRIVACIDAD (der) ───────────────
-    CL_W     = CW * 0.54
-    GAP      = 0.3 * cm
-    PR_X     = ML + CL_W + GAP
-    PR_W     = CW - CL_W - GAP
-    COL_DOC  = CL_W - 1.6 * cm
-    COL_PRE  = 1.6 * cm
-    HDR_H    = 0.52 * cm
-    ITEM_H   = 0.43 * cm
+    CL_W    = CW * 0.52
+    GAP     = 0.4 * cm
+    PR_X    = ML + CL_W + GAP
+    PR_W    = CW - CL_W - GAP
+    COL_PRE = 1.8 * cm
+    COL_DOC = CL_W - COL_PRE
+    HDR_H   = 0.60 * cm
+    ITEM_H  = 0.52 * cm
 
-    y_cl = y   # cursor checklist
-    y_pr = y   # cursor privacidad
+    y_cl = y
+    y_pr = y
 
     # Cabecera checklist
-    c.setLineWidth(0.5)
-    c.setFillColorRGB(0.82, 0.82, 0.82)
+    c.setLineWidth(0.6)
+    c.setFillColorRGB(0.80, 0.80, 0.80)
     c.rect(ML, y_cl - HDR_H, CL_W, HDR_H, fill=1, stroke=1)
     c.setFillColorRGB(0, 0, 0)
-    c.setFont("Helvetica-Bold", 6.5)
-    c.drawString(ML + 0.15 * cm, y_cl - HDR_H * 0.72, "CONTENIDO DEL EXPEDIENTE")
-    c.drawCentredString(ML + COL_DOC + COL_PRE / 2, y_cl - HDR_H * 0.72, "PRESENTA")
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(ML + 0.2 * cm, y_cl - HDR_H * 0.68, "CONTENIDO DEL EXPEDIENTE")
+    c.drawCentredString(ML + COL_DOC + COL_PRE / 2, y_cl - HDR_H * 0.68, "PRESENTA")
     y_cl -= HDR_H
 
-    c.setLineWidth(0.4)
+    c.setLineWidth(0.5)
     for item in checklist:
         st = checklist_state.get(item["id"])
-        c.setStrokeColorRGB(0.3, 0.3, 0.3)
+        c.setStrokeColorRGB(0.25, 0.25, 0.25)
         c.rect(ML, y_cl - ITEM_H, CL_W, ITEM_H, fill=0, stroke=1)
         c.line(ML + COL_DOC, y_cl - ITEM_H, ML + COL_DOC, y_cl)
-        c.setFont("Helvetica", 6)
-        c.drawString(ML + 0.12 * cm, y_cl - ITEM_H * 0.68, item["label"][:42])
+        c.setFont("Helvetica", 7.5)
+        c.drawString(ML + 0.15 * cm, y_cl - ITEM_H * 0.65, item["label"][:44])
         if st == "presenta":
-            c.setFont("Helvetica-Bold", 7)
-            c.drawCentredString(ML + COL_DOC + COL_PRE / 2, y_cl - ITEM_H * 0.68, "SI")
+            c.setFont("Helvetica-Bold", 8.5)
+            c.drawCentredString(ML + COL_DOC + COL_PRE / 2, y_cl - ITEM_H * 0.65, "SI")
         else:
-            c.setFont("Helvetica", 5.5)
-            c.drawCentredString(ML + COL_DOC + COL_PRE / 2, y_cl - ITEM_H * 0.68, "N/A")
+            c.setFont("Helvetica", 7)
+            c.drawCentredString(ML + COL_DOC + COL_PRE / 2, y_cl - ITEM_H * 0.65, "N/A")
         y_cl -= ITEM_H
 
-    # Aviso de privacidad (columna derecha)
-    c.setFont("Helvetica-Bold", 6.5)
-    c.drawString(PR_X, y_pr - 0.38 * cm, "AVISO DE PRIVACIDAD")
-    y_pr -= 0.55 * cm
-
-    FS = 5.8
-    LH = 0.315 * cm
-    c.setFont("Helvetica", FS)
-    words = PRIVACY_NOTICE.split()
-    line_words: list[str] = []
-    for word in words:
-        test = " ".join(line_words + [word])
-        if c.stringWidth(test, "Helvetica", FS) <= PR_W:
-            line_words.append(word)
-        else:
-            if line_words:
-                c.drawString(PR_X, y_pr, " ".join(line_words))
-                y_pr -= LH
-            line_words = [word]
-    if line_words:
-        c.drawString(PR_X, y_pr, " ".join(line_words))
+    # Aviso de privacidad justificado (columna derecha)
+    c.setFont("Helvetica-Bold", 7.5)
+    c.drawString(PR_X, y_pr - 0.42 * cm, "AVISO DE PRIVACIDAD")
+    y_pr -= 0.65 * cm
+    draw_justified_text(
+        c, PRIVACY_NOTICE, PR_X, y_pr, PR_W,
+        line_height=8.5, font="Helvetica", font_size=6.5,
+    )
 
     c.showPage()
     c.save()
@@ -515,17 +504,21 @@ def build_expediente_pdf_bytes(expediente, checklist, checklist_state) -> bytes:
 
     # ── FUSIONAR CON HOJA MEMBRETADA ───────────────────────────────
     letterhead_path = APP_DIR / "static" / "hoja_membretada.pdf"
-    if letterhead_path.exists():
-        lh_reader = _PdfReader(str(letterhead_path))
-        ct_reader = _PdfReader(content_buf)
-        lh_page   = lh_reader.pages[0]
-        lh_page.merge_page(ct_reader.pages[0])
-        writer = _PdfWriter()
-        writer.add_page(lh_page)
-        out_buf = BytesIO()
-        writer.write(out_buf)
-        out_buf.seek(0)
-        return out_buf.read()
+    try:
+        if letterhead_path.exists():
+            lh_reader = _PdfReader(str(letterhead_path))
+            ct_reader = _PdfReader(content_buf)
+            lh_page   = lh_reader.pages[0]
+            lh_page.merge_page(ct_reader.pages[0])
+            writer = _PdfWriter()
+            writer.add_page(lh_page)
+            out_buf = BytesIO()
+            writer.write(out_buf)
+            out_buf.seek(0)
+            return out_buf.read()
+    except Exception:
+        content_buf.seek(0)
+        return content_buf.read()
 
     content_buf.seek(0)
     return content_buf.read()
