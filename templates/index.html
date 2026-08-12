@@ -71,6 +71,19 @@
       </select>
     </div>
 
+    <div class="field">
+      <label>DÍAS RESTANTES</label>
+      <select id="dias" name="dias">
+        <option value="">TODOS</option>
+        <option value="vencido"  {% if request.args.get('dias')=='vencido'  %}selected{% endif %}>🔴 VENCIDO</option>
+        <option value="rojo"     {% if request.args.get('dias')=='rojo'     %}selected{% endif %}>🔴 0–3 DÍAS</option>
+        <option value="amarillo" {% if request.args.get('dias')=='amarillo' %}selected{% endif %}>🟡 4–8 DÍAS</option>
+        <option value="verde"    {% if request.args.get('dias')=='verde'    %}selected{% endif %}>🟢 9+ DÍAS</option>
+        <option value="cumplido" {% if request.args.get('dias')=='cumplido' %}selected{% endif %}>✅ CUMPLIDO</option>
+        <option value="sin_fecha"{% if request.args.get('dias')=='sin_fecha'%}selected{% endif %}>— SIN FECHA</option>
+      </select>
+    </div>
+
     <div class="actions">
       <!-- APLICAR -->
       <button class="btn btn--icon"
@@ -173,8 +186,9 @@
             </td>
 
             <td class="right">
-              <a class="btn btn--sm" href="{{ url_for('expediente_view', expediente_id=r['id']) }}">
-                ABRIR
+              <a class="btn btn--sm btn--icon" href="{{ url_for('expediente_view', expediente_id=r['id']) }}"
+                 style="font-size:15px; font-weight:400;">
+                →
               </a>
             </td>
           </tr>
@@ -191,7 +205,7 @@
   <div class="pagination">
     {% if page > 1 %}
       <a class="btn btn--ghost btn--sm"
-         href="{{ url_for('index', q=q, year=year, sort=sort, page=page-1) }}">← ANT</a>
+         href="{{ url_for('index', q=q, year=year, sort=sort, dias=dias, page=page-1) }}">← ANT</a>
     {% else %}
       <span class="btn btn--ghost btn--sm disabled">← ANT</span>
     {% endif %}
@@ -200,7 +214,7 @@
 
     {% if page < total_pages %}
       <a class="btn btn--ghost btn--sm"
-         href="{{ url_for('index', q=q, year=year, sort=sort, page=page+1) }}">SIG →</a>
+         href="{{ url_for('index', q=q, year=year, sort=sort, dias=dias, page=page+1) }}">SIG →</a>
     {% else %}
       <span class="btn btn--ghost btn--sm disabled">SIG →</span>
     {% endif %}
@@ -322,7 +336,8 @@
         var params = new URLSearchParams(window.location.search);
         var q    = params.get('q')    || '';
         var year = params.get('year') || '';
-        var url  = '/expedientes/ids.json?q=' + encodeURIComponent(q) + '&year=' + encodeURIComponent(year);
+        var dias = params.get('dias') || '';
+        var url  = '/expedientes/ids.json?q=' + encodeURIComponent(q) + '&year=' + encodeURIComponent(year) + '&dias=' + encodeURIComponent(dias);
         selectAll.disabled = true;
         fetch(url)
           .then(function(r){ return r.json(); })

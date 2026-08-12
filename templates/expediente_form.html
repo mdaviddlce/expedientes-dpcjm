@@ -5,48 +5,75 @@
   <div class="panel__head">
     <div>
       <h2>{{ "NUEVO EXPEDIENTE" if mode=="new" else "EDITAR EXPEDIENTE" }}</h2>
-      <p class="muted">CAPTURA</p>
+      <p class="muted">{{ "CAPTURA" if mode=="new" else "MODIFICAR DATOS" }}</p>
     </div>
     <a class="btn btn--ghost" href="{{ url_for('index') }}">REGRESAR AL INICIO</a>
   </div>
 
-  <form method="post" action="{{ url_for('expediente_create') if mode=='new' else url_for('expediente_update', expediente_id=expediente['id']) }}">
+  <form method="post" action="{{ url_for('expediente_create') if mode=='new' else url_for('expediente_update', expediente_id=expediente['id']) }}"
+        style="padding: 0 16px 20px;">
+
+    <!-- ── IDENTIFICACIÓN ───────────────────────────── -->
+    <p class="form-section">IDENTIFICACIÓN</p>
     <div class="grid2">
       <div class="field">
         <label>EXPEDIENTE</label>
-        <input name="expediente_code" value="{{ expediente['expediente_code'] if expediente else '' }}" required>
+        <input name="expediente_code"
+               value="{{ expediente['expediente_code'] if expediente else '' }}"
+               placeholder="0001/0126/DPCJM" required>
       </div>
 
       <div class="field">
         <label>NOMBRE DEL INMUEBLE</label>
-        <input name="inmueble_nombre" value="{{ expediente['inmueble_nombre'] if expediente else '' }}" required>
+        <input name="inmueble_nombre"
+               value="{{ expediente['inmueble_nombre'] if expediente else '' }}"
+               placeholder="Nombre del negocio o propiedad" required>
       </div>
+    </div>
 
+    <!-- ── PROPIETARIO / REPRESENTANTE ──────────────── -->
+    <p class="form-section">PROPIETARIO / REPRESENTANTE</p>
+    <div class="grid2">
       <div class="field">
         <label>REPRESENTANTE LEGAL</label>
-        <input name="representante_legal" value="{{ expediente['representante_legal'] if expediente else '' }}">
+        <input name="representante_legal"
+               value="{{ expediente['representante_legal'] if expediente else '' }}"
+               placeholder="Nombre completo">
       </div>
 
       <div class="field">
         <label>APODERADOS</label>
-        <input name="apoderados" value="{{ expediente['apoderados'] if expediente else '' }}">
+        <input name="apoderados"
+               value="{{ expediente['apoderados'] if expediente else '' }}"
+               placeholder="Nombre(s) del apoderado">
       </div>
 
-      <div class="field">
+      <div class="field field--full">
         <label>DOMICILIO DE LA INSPECCION</label>
-        <input name="domicilio_inspeccion" value="{{ expediente['domicilio_inspeccion'] if expediente else '' }}">
+        <input name="domicilio_inspeccion"
+               value="{{ expediente['domicilio_inspeccion'] if expediente else '' }}"
+               placeholder="Calle, número, colonia, municipio">
       </div>
 
       <div class="field">
         <label>TELEFONO</label>
-        <input name="telefono" value="{{ expediente['telefono'] if expediente else '' }}">
+        <input name="telefono"
+               value="{{ expediente['telefono'] if expediente else '' }}"
+               placeholder="10 dígitos">
       </div>
+    </div>
 
+    <!-- ── CLASIFICACIÓN ────────────────────────────── -->
+    <p class="form-section">CLASIFICACIÓN</p>
+    <div class="grid2">
       <div class="field">
         <label>QUIEN SOLICITA</label>
         <select name="quien_solicita" required>
           {% for opt in who_options %}
-            <option value="{{ opt }}" {% if expediente and expediente["quien_solicita"]==opt %}selected{% endif %}>{{ opt }}</option>
+            <option value="{{ opt }}"
+              {% if expediente and expediente["quien_solicita"]==opt %}selected{% endif %}>
+              {{ opt }}
+            </option>
           {% endfor %}
         </select>
       </div>
@@ -54,7 +81,7 @@
       <div class="field">
         <label>ARCHIVO FISICO</label>
         <select name="archivo_fisico">
-          <option value="">—</option>
+          <option value="">— Sin asignar</option>
           {% for opt in archivo_options %}
             <option value="{{ opt }}"
               {% if expediente and (expediente["archivo_fisico"] or "") == opt %}selected{% endif %}>
@@ -65,36 +92,40 @@
       </div>
     </div>
 
-    <div class="spacer"></div>
-
-    <div class="table-wrap">
-      <table class="table">
-        <thead>
-          <tr>
-            <th>CONTENIDO DEL EXPEDIENTE</th>
-            <th class="center">PRESENTA</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for item in checklist %}
-            {% set st = checklist_state.get(item["id"]) if checklist_state else None %}
-            <tr>
-              <td>{{ item["label"] }}</td>
-              <td class="center">
-                <input type="checkbox" name="item_{{ item['id'] }}" value="presenta"
-                       {% if st=="presenta" %}checked{% endif %}>
-              </td>
-            </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+    <!-- ── CONTENIDO DEL EXPEDIENTE ─────────────────── -->
+    <p class="form-section">CONTENIDO DEL EXPEDIENTE</p>
+    <div class="checklist-grid">
+      {% for item in checklist %}
+        {% set st = checklist_state.get(item["id"]) if checklist_state else None %}
+        {% set checked = st == "presenta" %}
+        <label class="checklist-item{% if checked %} is-checked{% endif %}"
+               id="cl-label-{{ item['id'] }}">
+          <input type="checkbox"
+                 name="item_{{ item['id'] }}" value="presenta"
+                 {% if checked %}checked{% endif %}
+                 onchange="toggleChecked(this)">
+          {{ item["label"] }}
+        </label>
+      {% endfor %}
     </div>
 
-    <div class="actions">
+    <!-- ── ACCIONES ──────────────────────────────────── -->
+    <div class="actions" style="margin-top: 24px;">
       <a class="btn btn--ghost" href="{{ url_for('index') }}">CANCELAR</a>
       <button class="btn" type="submit">GUARDAR</button>
     </div>
   </form>
 </section>
+
+<script>
+function toggleChecked(input) {
+  var label = input.closest('.checklist-item');
+  if (input.checked) {
+    label.classList.add('is-checked');
+  } else {
+    label.classList.remove('is-checked');
+  }
+}
+</script>
 
 {% endblock %}

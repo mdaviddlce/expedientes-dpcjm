@@ -2,13 +2,14 @@
 {% block content %}
 
 <section class="panel glass">
+
+  <!-- ── CABECERA ──────────────────────────────────── -->
   <div class="panel__head">
     <div>
-      <h2>EXPEDIENTE</h2>
-      <p class="muted mono">{{ expediente["expediente_code"] }}</p>
+      <h2>{{ expediente["expediente_code"] }}</h2>
+      <p class="muted">{{ expediente["inmueble_nombre"] }}</p>
     </div>
-
-    <div class="row" style="justify-content:flex-end; gap:10px; margin-bottom:12px;">
+    <div class="row" style="gap:8px; flex-wrap:wrap; justify-content:flex-end;">
       <a class="btn btn--ghost" id="btnVolver" href="{{ url_for('index') }}">← VOLVER</a>
       <script>
         (function(){
@@ -16,16 +17,9 @@
           if (saved) document.getElementById('btnVolver').href = saved;
         })();
       </script>
-
-      <a class="btn btn--ghost" href="{{ url_for('expediente_pdf', expediente_id=expediente['id']) }}">
-        PDF
-      </a>
-
+      <a class="btn btn--ghost" href="{{ url_for('expediente_pdf', expediente_id=expediente['id']) }}">PDF</a>
       {% if can_edit %}
-        <a class="btn" href="{{ url_for('expediente_edit', expediente_id=expediente['id']) }}">
-          EDITAR
-        </a>
-
+        <a class="btn" href="{{ url_for('expediente_edit', expediente_id=expediente['id']) }}">EDITAR</a>
         <form method="post"
               action="{{ url_for('expediente_delete', expediente_id=expediente['id']) }}"
               class="inline"
@@ -36,225 +30,193 @@
     </div>
   </div>
 
-  <div class="paper glass-soft">
-    <div class="table-wrap">
-      <table class="table table--compact">
-        <tbody>
-          <tr><th>EXPEDIENTE</th><td class="mono">{{ expediente["expediente_code"] }}</td></tr>
-          <tr><th>NOMBRE DEL INMUEBLE</th><td>{{ expediente["inmueble_nombre"] }}</td></tr>
-          <tr><th>REPRESENTANTE LEGAL</th><td>{{ expediente["representante_legal"] or "—" }}</td></tr>
-          <tr><th>APODERADOS</th><td>{{ expediente["apoderados"] or "—" }}</td></tr>
-          <tr><th>DOMICILIO DE LA INSPECCION</th><td>{{ expediente["domicilio_inspeccion"] or "—" }}</td></tr>
-          <tr><th>TELEFONO</th><td>{{ expediente["telefono"] or "—" }}</td></tr>
-          <tr><th>QUIEN SOLICITA</th><td>{{ expediente["quien_solicita"] }}</td></tr>
-          <tr><th>ARCHIVO FISICO</th><td>{{ expediente["archivo_fisico"] or "—" }}</td></tr>
-          <tr><th>VERIFICACIONES/AVISOS</th><td>{{ (expediente["verificaciones"] or 0) | int }}</td></tr>
-        </tbody>
-      </table>
-    </div>
+  <div style="padding: 0 16px 20px; display: grid; gap: 24px;">
 
-    <div class="spacer"></div>
-
-    <div class="table-wrap">
-      <table class="table">
-        <thead>
-          <tr>
-            <th>CONTENIDO DEL EXPEDIENTE</th>
-            <th class="center">PRESENTA</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for item in checklist %}
-            {% set st = checklist_state.get(item["id"]) %}
-            <tr>
-              <td>{{ item["label"] }}</td>
-              <td class="center">{{ "✓" if st=="presenta" else "" }}</td>
-            </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-
-    <div class="spacer"></div>
-
-    <section class="panel glass">
-      <div class="panel__head">
-        <div>
-          <h2>DOCUMENTOS</h2>
-          <p class="muted">SELECCIONA FECHAS Y GUARDA.</p>
+    <!-- ── DATOS GENERALES ───────────────────────────── -->
+    <div>
+      <p class="form-section">DATOS GENERALES</p>
+      <div class="info-grid">
+        <div class="info-item">
+          <span class="info-label">REPRESENTANTE LEGAL</span>
+          <span class="info-value">{{ expediente["representante_legal"] or "—" }}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">APODERADOS</span>
+          <span class="info-value">{{ expediente["apoderados"] or "—" }}</span>
+        </div>
+        <div class="info-item info-item--full">
+          <span class="info-label">DOMICILIO DE LA INSPECCION</span>
+          <span class="info-value">{{ expediente["domicilio_inspeccion"] or "—" }}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">TELEFONO</span>
+          <span class="info-value">{{ expediente["telefono"] or "—" }}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">QUIEN SOLICITA</span>
+          <span class="info-value">{{ expediente["quien_solicita"] }}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">ARCHIVO FISICO</span>
+          <span class="info-value">{{ expediente["archivo_fisico"] or "—" }}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">VERIFICACIONES / AVISOS</span>
+          <span class="info-value">{{ (expediente["verificaciones"] or 0) | int }}</span>
         </div>
       </div>
+    </div>
+
+    <!-- ── CONTENIDO DEL EXPEDIENTE ─────────────────── -->
+    <div>
+      <p class="form-section">CONTENIDO DEL EXPEDIENTE</p>
+      <div class="checklist-grid">
+        {% for item in checklist %}
+          {% set st = checklist_state.get(item["id"]) %}
+          {% set checked = st == "presenta" %}
+          <div class="checklist-item checklist-item--view {% if checked %}is-checked{% endif %}">
+            <span class="checklist-dot {% if checked %}dot--ok{% else %}dot--no{% endif %}"></span>
+            {{ item["label"] }}
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- ── DOCUMENTOS ────────────────────────────────── -->
+    <div>
+      <p class="form-section">DOCUMENTOS</p>
 
       {% if can_edit %}
       <form method="post"
-            action="{{ url_for('expediente_documentos_update', expediente_id=expediente['id']) }}"
-            class="documentos-form">
+            action="{{ url_for('expediente_documentos_update', expediente_id=expediente['id']) }}">
 
-        <div class="documentos-grid">
+        <div class="grid2" style="margin-bottom: 14px;">
+
           <div class="field">
             <label>CITATORIO</label>
-            <input type="date" name="citatorio_fecha"
-                   value="{{ expediente['citatorio_fecha'] or '' }}">
+            <input type="date" name="citatorio_fecha" value="{{ expediente['citatorio_fecha'] or '' }}">
           </div>
-
           <div class="field">
             <label>NO. ACTA INSPECCION</label>
             <input type="text" name="acta_inspeccion_folio"
                    placeholder="AIR-025-DPCM-2026"
                    value="{{ expediente['acta_inspeccion_folio'] or '' }}">
           </div>
-
           <div class="field">
             <label>INSPECCION</label>
-            <input type="date" name="inspeccion"
-                   value="{{ expediente['inspeccion'] or '' }}">
+            <input type="date" name="inspeccion" value="{{ expediente['inspeccion'] or '' }}">
           </div>
-
           <div class="field">
             <label>FECHA LÍMITE</label>
-            <input type="date" name="fecha_limite"
-                   id="fecha_limite_input"
+            <input type="date" name="fecha_limite" id="fecha_limite_input"
                    value="{{ expediente['fecha_limite'] or '' }}">
           </div>
-
           <div class="field">
             <label>DÍAS RESTANTES</label>
-            <div id="dias_restantes_display"
-                 class="dias-restantes"
-                 data-fecha="{{ expediente['fecha_limite'] or '' }}">
-              —
-            </div>
+            <div id="dias_restantes_display" class="dias-restantes"
+                 data-fecha="{{ expediente['fecha_limite'] or '' }}">—</div>
           </div>
-
           <div class="field">
             <label>ACTA VERIFICACION</label>
             <input type="date" name="acta_verificacion_fecha"
                    value="{{ expediente['acta_verificacion_fecha'] or '' }}">
           </div>
-
           <div class="field">
             <label>RESOLUTIVO</label>
-            <input type="date" name="resolutivo_fecha"
-                   value="{{ expediente['resolutivo_fecha'] or '' }}">
+            <input type="date" name="resolutivo_fecha" value="{{ expediente['resolutivo_fecha'] or '' }}">
           </div>
-
           <div class="field">
             <label>ULTIMO AVISO</label>
-            <input type="date" name="ultimo_aviso_fecha"
-                   value="{{ expediente['ultimo_aviso_fecha'] or '' }}">
+            <input type="date" name="ultimo_aviso_fecha" value="{{ expediente['ultimo_aviso_fecha'] or '' }}">
           </div>
-
           <div class="field">
             <label>SEGUNDO AVISO ANTES DE CLAUSURA</label>
-            <input type="date" name="segundo_aviso_fecha"
-                   value="{{ expediente['segundo_aviso_fecha'] or '' }}">
+            <input type="date" name="segundo_aviso_fecha" value="{{ expediente['segundo_aviso_fecha'] or '' }}">
           </div>
-
           <div class="field">
             <label>CLAUSURA</label>
-            <input type="date" name="clausura_fecha"
-                   value="{{ expediente['clausura_fecha'] or '' }}">
+            <input type="date" name="clausura_fecha" value="{{ expediente['clausura_fecha'] or '' }}">
           </div>
-
           <div class="field">
             <label>VO BO</label>
-            <input type="date" name="vobo_fecha"
-                   value="{{ expediente['vobo_fecha'] or '' }}">
+            <input type="date" name="vobo_fecha" value="{{ expediente['vobo_fecha'] or '' }}">
           </div>
-
           <div class="field">
             <label>PIPC</label>
-            <input type="date" name="pipc_fecha"
-                   value="{{ expediente['pipc_fecha'] or '' }}">
+            <input type="date" name="pipc_fecha" value="{{ expediente['pipc_fecha'] or '' }}">
+          </div>
+          <div class="field field--full">
+            <label>OBSERVACIONES</label>
+            <textarea name="observaciones" rows="3"
+                      placeholder="ESCRIBE ALGUNA OBSERVACION DEL EXPEDIENTE...">{{ expediente['observaciones'] or '' }}</textarea>
           </div>
         </div>
 
-        <div class="field field--full">
-          <label>OBSERVACIONES</label>
-          <textarea name="observaciones"
-                    rows="4"
-                    placeholder="ESCRIBE ALGUNA OBSERVACION DEL EXPEDIENTE...">{{ expediente['observaciones'] or '' }}</textarea>
-        </div>
-
-        <div class="documentos-actions">
+        <div class="actions">
           <button class="btn" type="submit">GUARDAR</button>
         </div>
       </form>
+
       {% else %}
-        <div class="documentos-grid">
-          <div class="field">
-            <label>CITATORIO</label>
-            <input type="date" value="{{ expediente['citatorio_fecha'] or '' }}" disabled>
-          </div>
-
-          <div class="field">
-            <label>NO. ACTA INSPECCION</label>
-            <input type="text" value="{{ expediente['acta_inspeccion_folio'] or '' }}" disabled>
-          </div>
-
-          <div class="field">
-            <label>INSPECCION</label>
-            <input type="date" value="{{ expediente['inspeccion'] or '' }}" disabled>
-          </div>
-
-          <div class="field">
-            <label>FECHA LÍMITE</label>
-            <input type="date" value="{{ expediente['fecha_limite'] or '' }}" disabled>
-          </div>
-
-          <div class="field">
-            <label>DÍAS RESTANTES</label>
-            <div class="dias-restantes"
-                 data-fecha="{{ expediente['fecha_limite'] or '' }}">
-              —
-            </div>
-          </div>
-
-          <div class="field">
-            <label>ACTA VERIFICACION</label>
-            <input type="date" value="{{ expediente['acta_verificacion_fecha'] or '' }}" disabled>
-          </div>
-
-          <div class="field">
-            <label>RESOLUTIVO</label>
-            <input type="date" value="{{ expediente['resolutivo_fecha'] or '' }}" disabled>
-          </div>
-
-          <div class="field">
-            <label>ULTIMO AVISO</label>
-            <input type="date" value="{{ expediente['ultimo_aviso_fecha'] or '' }}" disabled>
-          </div>
-
-          <div class="field">
-            <label>SEGUNDO AVISO ANTES DE CLAUSURA</label>
-            <input type="date" value="{{ expediente['segundo_aviso_fecha'] or '' }}" disabled>
-          </div>
-
-          <div class="field">
-            <label>CLAUSURA</label>
-            <input type="date" value="{{ expediente['clausura_fecha'] or '' }}" disabled>
-          </div>
-
-          <div class="field">
-            <label>VO BO</label>
-            <input type="date" value="{{ expediente['vobo_fecha'] or '' }}" disabled>
-          </div>
-
-          <div class="field">
-            <label>PIPC</label>
-            <input type="date" value="{{ expediente['pipc_fecha'] or '' }}" disabled>
-          </div>
+      <div class="grid2">
+        <div class="field">
+          <label>CITATORIO</label>
+          <input type="date" value="{{ expediente['citatorio_fecha'] or '' }}" disabled>
         </div>
-
+        <div class="field">
+          <label>NO. ACTA INSPECCION</label>
+          <input type="text" value="{{ expediente['acta_inspeccion_folio'] or '' }}" disabled>
+        </div>
+        <div class="field">
+          <label>INSPECCION</label>
+          <input type="date" value="{{ expediente['inspeccion'] or '' }}" disabled>
+        </div>
+        <div class="field">
+          <label>FECHA LÍMITE</label>
+          <input type="date" value="{{ expediente['fecha_limite'] or '' }}" disabled>
+        </div>
+        <div class="field">
+          <label>DÍAS RESTANTES</label>
+          <div class="dias-restantes" data-fecha="{{ expediente['fecha_limite'] or '' }}">—</div>
+        </div>
+        <div class="field">
+          <label>ACTA VERIFICACION</label>
+          <input type="date" value="{{ expediente['acta_verificacion_fecha'] or '' }}" disabled>
+        </div>
+        <div class="field">
+          <label>RESOLUTIVO</label>
+          <input type="date" value="{{ expediente['resolutivo_fecha'] or '' }}" disabled>
+        </div>
+        <div class="field">
+          <label>ULTIMO AVISO</label>
+          <input type="date" value="{{ expediente['ultimo_aviso_fecha'] or '' }}" disabled>
+        </div>
+        <div class="field">
+          <label>SEGUNDO AVISO ANTES DE CLAUSURA</label>
+          <input type="date" value="{{ expediente['segundo_aviso_fecha'] or '' }}" disabled>
+        </div>
+        <div class="field">
+          <label>CLAUSURA</label>
+          <input type="date" value="{{ expediente['clausura_fecha'] or '' }}" disabled>
+        </div>
+        <div class="field">
+          <label>VO BO</label>
+          <input type="date" value="{{ expediente['vobo_fecha'] or '' }}" disabled>
+        </div>
+        <div class="field">
+          <label>PIPC</label>
+          <input type="date" value="{{ expediente['pipc_fecha'] or '' }}" disabled>
+        </div>
         <div class="field field--full">
           <label>OBSERVACIONES</label>
-          <textarea rows="4" disabled>{{ expediente['observaciones'] or '' }}</textarea>
+          <textarea rows="3" disabled>{{ expediente['observaciones'] or '' }}</textarea>
         </div>
+      </div>
       {% endif %}
-    </section>
-  </div>
-</section>
+    </div>
 
+  </div><!-- /padding wrapper -->
+</section>
 
 <script>
 function calcDiasRestantes() {
@@ -262,13 +224,11 @@ function calcDiasRestantes() {
   var pipc = "{{ expediente['pipc_fecha'] or '' }}";
 
   document.querySelectorAll(".dias-restantes").forEach(function(el) {
-    // Si ya tiene VO BO o PIPC → cumplido ✅
     if (vobo || pipc) {
       el.className = "dias-restantes dias--verde";
       el.textContent = "✅ CUMPLIDO";
       return;
     }
-
     var fecha = el.dataset.fecha;
     if (!fecha) { el.textContent = "—"; el.className = "dias-restantes"; return; }
 
@@ -291,10 +251,8 @@ function calcDiasRestantes() {
     }
   });
 }
-
 calcDiasRestantes();
 
-// Actualiza en tiempo real al cambiar fecha_limite
 var input = document.getElementById("fecha_limite_input");
 if (input) {
   input.addEventListener("change", function() {

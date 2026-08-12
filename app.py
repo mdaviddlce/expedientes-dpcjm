@@ -417,7 +417,7 @@ def build_expediente_pdf_bytes(expediente, checklist, checklist_state) -> bytes:
     LINE_H   = 0.42 * cm   # alto de cada línea extra
     PAD_V    = 0.28 * cm   # padding vertical interior
     LBL_FS   = 9
-    VAL_FS   = 9.5
+    VAL_FS   = 11
     c.setLineWidth(0.6)
     c.setStrokeColorRGB(0.2, 0.2, 0.2)
 
@@ -444,7 +444,7 @@ def build_expediente_pdf_bytes(expediente, checklist, checklist_state) -> bytes:
 
     def draw_row(label_top, label_bot, value, y_pos):
         max_w = CW - LABEL_W - 0.5 * cm
-        val_lines = wrap_text(str(value) if value else "", "Helvetica", VAL_FS, max_w)
+        val_lines = wrap_text(str(value) if value else "", "Helvetica-Bold", VAL_FS, max_w)
         rh = row_height(label_bot, val_lines)
 
         c.rect(ML, y_pos - rh, CW, rh, fill=0, stroke=1)
@@ -458,10 +458,9 @@ def build_expediente_pdf_bytes(expediente, checklist, checklist_state) -> bytes:
         else:
             c.drawString(ML + 0.25 * cm, y_pos - rh / 2 + LINE_H * 0.3, label_top)
 
-        # Valor (multi-línea)
-        c.setFont("Helvetica", VAL_FS)
+        # Valor (multi-línea, negritas)
+        c.setFont("Helvetica-Bold", VAL_FS)
         vx = ML + LABEL_W + 0.25 * cm
-        # Centrar verticalmente el bloque de texto
         block_h = len(val_lines) * LINE_H
         vy = y_pos - (rh - block_h) / 2 - LINE_H * 0.75
         for line in val_lines:
@@ -518,9 +517,6 @@ def build_expediente_pdf_bytes(expediente, checklist, checklist_state) -> bytes:
         if st == "presenta":
             c.setFont("Helvetica-Bold", 8.5)
             c.drawCentredString(ML + COL_DOC + COL_PRE / 2, y_cl - ITEM_H * 0.65, "SI")
-        else:
-            c.setFont("Helvetica", 7)
-            c.drawCentredString(ML + COL_DOC + COL_PRE / 2, y_cl - ITEM_H * 0.65, "N/A")
         y_cl -= ITEM_H
 
     # Aviso de privacidad justificado (columna derecha)
@@ -830,16 +826,16 @@ def create_app() -> Flask:
     # -------------------------
     PAGE_SIZE = 50
 
-    @app.get("/expedientes/ids.json")
-    @login_required
-    def expedientes_ids():
-        """Devuelve todos los IDs que coinciden con el filtro actual (para seleccionar todo)."""
-        from flask import jsonify
-        q    = (request.args.get("q") or "").strip()
-        year = (request.args.get("year") or "").strip()
-        db   = get_db()
-        where  = "WHERE 1=1"
-        params: list = []
+    DIAS_FILTER_SQL = {
+        "vencido":   "fecha_limite IS NOT NULL AND date(fecha_limite) < date('now') AND vobo_fecha IS NULL AND pipc_fecha IS NULL",
+        "rojo":      "fecha_limite IS NOT NULL AND CAST(julianday(fecha_limite) - julianday('now') AS INTEGER) BETWEEN 0 AND 3 AND vobo_fecha IS NULL AND pipc_fecha IS NULL",
+        "amarillo":  "fecha_limite IS NOT NULL AND CAST(julianday(fecha_limite) - julianday('now') AS INTEGER) BETWEEN 4 AND 8 AND vobo_fecha IS NULL AND pipc_fecha IS NULL",
+        "verde":     "fecha_limite IS NOT NULL AND CAST(julianday(fecha_limite) - julianday('now') AS INTEGER) >= 9 AND vobo_fecha IS NULL AND pipc_fecha IS NULL",
+        "cumplido":  "(vobo_fecha IS NOT NULL OR pipc_fecha IS NOT NULL)",
+        "sin_fecha": "fecha_limite IS NULL AND vobo_fecha IS NULL AND pipc_fecha IS NULL",
+    }
+
+    def apply_filters(where, params, q, year, dias):
         if q:
             where += """ AND (
                 expediente_code LIKE ? OR inmueble_nombre LIKE ? OR representante_legal LIKE ?
@@ -850,37 +846,36 @@ def create_app() -> Flask:
         if year:
             where += " AND substr(expediente_code, 8, 2) = ?"
             params.append(year[2:4])
+        if dias and dias in DIAS_FILTER_SQL:
+            where += f" AND {DIAS_FILTER_SQL[dias]}"
+        return where, params
+
+    @app.get("/expedientes/ids.json")
+    @login_required
+    def expedientes_ids():
+        """Devuelve todos los IDs que coinciden con el filtro actual (para seleccionar todo)."""
+        from flask import jsonify
+        q    = (request.args.get("q") or "").strip()
+        year = (request.args.get("year") or "").strip()
+        dias = (request.args.get("dias") or "").strip()
+        db   = get_db()
+        where, params = apply_filters("WHERE 1=1", [], q, year, dias)
         rows = db.execute(f"SELECT id FROM expedientes {where}", params).fetchall()
         return jsonify([str(r["id"]) for r in rows])
 
     @app.get("/")
     @login_required
     def index():
-        q = (request.args.get("q") or "").strip()
+        q    = (request.args.get("q")    or "").strip()
         year = (request.args.get("year") or "").strip()
         sort = (request.args.get("sort") or "desc").strip().lower()  # asc|desc
+        dias = (request.args.get("dias") or "").strip()
         page = max(1, int(request.args.get("page") or 1))
 
         sort_dir = "ASC" if sort == "asc" else "DESC"
 
         db = get_db()
-        where = "WHERE 1=1"
-        params: list = []
-
-        if q:
-            where += """
-              AND (
-                expediente_code LIKE ? OR inmueble_nombre LIKE ? OR representante_legal LIKE ?
-                OR apoderados LIKE ? OR domicilio_inspeccion LIKE ? OR telefono LIKE ?
-              )
-            """
-            like = f"%{q}%"
-            params += [like, like, like, like, like, like]
-
-        if year:
-            yy = year[2:4]  # "26" si year es "2026"
-            where += " AND substr(expediente_code, 8, 2) = ?"
-            params.append(yy)
+        where, params = apply_filters("WHERE 1=1", [], q, year, dias)
 
         order = f"""
         ORDER BY
@@ -920,6 +915,7 @@ def create_app() -> Flask:
             rows=rows,
             q=q,
             year=year,
+            dias=dias,
             years=[r["y"] for r in years if r["y"]],
             page=page,
             total_pages=total_pages,
