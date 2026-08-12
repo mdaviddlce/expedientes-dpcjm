@@ -24,3 +24,6 @@ instance/
 # Archivos generados
 *.pdf
 *.zip
+
+#texto
+README.md
